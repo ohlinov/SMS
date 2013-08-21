@@ -1,0 +1,131 @@
+<project name="SMS" default="compile" basedir=".">
+  <property name="app.name"      value="sms_adapter"/> 
+  <property name="app.path"      value="/${app.name}"/>
+  <property name="app.version"   value="1.0"/>
+  <property name="build.home"    value="${basedir}/build"/>
+  <property name="dist.home"     value="${basedir}/dist"/> 
+  <property name="src.home"      value="${basedir}/src"/>
+  <property name="src.home_client"  value="${basedir}/client_src"/>
+
+  
+
+<!--  ==================== Compilation Control Options ==================== -->
+  <property name="compile.debug"       value="true"/>
+  <property name="compile.deprecation" value="false"/>
+  <property name="compile.optimize"    value="true"/>
+<!--==================== Compilation Classpath =========================== -->
+  <path id="compile.classpath">
+    <!-- Include all elements that Tomcat exposes to applications -->
+     <fileset dir="${basedir}/lib">
+      <include name="*.jar"/>
+    </fileset>
+  </path>
+<!-- ==================== All Target ====================================== -->
+
+
+
+  <target name="all" depends="clean,compile, dist"
+   description="Clean build and dist directories, then compile"/>
+
+
+
+<!-- ==================== Clean Target ==================================== -->
+  <target name="clean"
+   description="Delete old build and dist directories">
+    <delete dir="${build.home}"/>
+    <delete dir="${dist.home}"/>
+  </target>
+<!-- ==================== Compile Target ================================== -->
+
+
+
+  <target name="compile" depends="prepare"
+   description="Compile Java sources">
+
+    <!-- Compile Java classes as necessary -->
+    <mkdir    dir="${build.home}"/>
+    <javac srcdir="${src.home}"
+          destdir="${build.home}"
+            debug="${compile.debug}"
+      deprecation="${compile.deprecation}"
+         optimize="${compile.optimize}"
+    	 source="1.4" 
+    	 target="1.4">
+        <classpath refid="compile.classpath"/>
+    </javac>
+   	<javac srcdir="${src.home_client}"
+   	      destdir="${build.home}"
+   	        debug="${compile.debug}"
+   	  deprecation="${compile.deprecation}"
+   	     optimize="${compile.optimize}"
+   	       source="1.4"
+   	       target="1.4">
+   		<classpath refid="compile.classpath"/>
+   </javac>
+    </target>
+
+
+
+<!-- ==================== Dist Target ===================================== -->
+
+
+
+
+  <target name="dist" depends="compile,javadoc"
+   description="Create binary distribution">
+
+   <!-- <copy todir="${build.home}">
+		<fileset file="${basedir}/log4j.properties" />
+	</copy>-->
+
+
+
+
+    <!-- Create application JAR file -->
+    <jar jarfile="${dist.home}/ru.elmsoft.sms.jar"
+         basedir="${build.home}">
+         <fileset file="${basedir}/log4j.properties"/>
+    </jar>
+
+  </target>
+
+
+
+
+
+<!-- ==================== Javadoc Target ================================== -->
+
+
+
+  <target name="javadoc" depends="compile"
+   description="Create Javadoc API documentation">
+
+    <mkdir          dir="${dist.home}/docs/api"/>
+    <javadoc sourcepath="${src.home}"
+                destdir="${dist.home}/docs/api"
+           packagenames="*">
+      <classpath refid="compile.classpath"/>
+    </javadoc>
+
+  </target>
+
+
+
+<!-- ====================== List Target =================================== -->
+
+
+
+
+
+<!-- ==================== Prepare Target ================================== -->
+
+
+
+  <target name="prepare">
+    <!-- Create build directories as needed -->
+    <mkdir  dir="${build.home}"/>
+  </target>
+
+
+
+</project>
