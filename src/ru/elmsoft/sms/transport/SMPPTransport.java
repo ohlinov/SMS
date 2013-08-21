@@ -238,20 +238,82 @@ public class SMPPTransport extends AbstractSMSTransport implements SMSTransport,
     }
 
     protected SmsMessage createMessage(SMSMessage message) {
-        EMSMessage msg = null;
-        msg = new EMSMessage();
-        if (!message.getMessage().matches("[\\p{ASCII}]*")) {
+        EMSMessage msg = new EMSMessage();
+        final int lengthOfTextToSend = message.getMessage().length();
+        final boolean containOnlyAsciiChars = isContainOnlyAsciiChars(message.getMessage());
+        short codingGroup;
+        short alphabet;
+        if (!containOnlyAsciiChars) {
             msg.setType(EMSMessage.MT_TEXT);
-            msg.setAlphabet(SmsMessage.DC_UCS2);
-            int truncated_length = (maxLengthPartMessage / 2) > message.getMessage().length() ? message.getMessage().length() : (maxLengthPartMessage / 2);
+            codingGroup = getCodingGroupForMessageWithNonASCIIText(SmsMessage.DC_GROUP_DATA);
+            alphabet = getAlphabetForMessageWithNonASCIIText(SmsMessage.DC_UCS2);
+            int truncated_length = (maxLengthPartMessage / 2) > lengthOfTextToSend
+                    ? lengthOfTextToSend
+                    : (maxLengthPartMessage / 2);
             msg.add(new EMSText(message.getMessage().substring(0, truncated_length)));
-        } else {
-            msg.setCodingGroup(SmsMessage.DC_DEFAULT);
-            msg.setAlphabet(SmsMessage.DC_DEFAULT);
-            int truncated_length = maxLengthPartMessage > message.getMessage().length() ? message.getMessage().length() : maxLengthPartMessage;
+        } else { // ASCII only
+            int truncated_length = maxLengthPartMessage > lengthOfTextToSend
+                    ? lengthOfTextToSend
+                    : maxLengthPartMessage;
+            codingGroup = getCodingGroupForMessageWithASCIIText(SmsMessage.DC_GROUP_GENERAL);
+            alphabet = getAlphabetForMessageWithASCIIText(SmsMessage.DC_DEFAULT);
             msg.add(new EMSText(message.getMessage().substring(0, truncated_length)));
         }
+        msg.setAlphabet(alphabet);
+        if (canOverrideCodingGroup()){
+            msg.setCodingGroup(codingGroup);
+        }
         return msg;
+    }
+
+    private boolean canOverrideCodingGroup() {
+        return getBooleanValue("override.coding.group", false);
+    }
+
+    private boolean getBooleanValue(String key, boolean defaultValue) {
+        if (initParams.containsKey(key)) {
+            return toBoolean(initParams.getProperty(key));
+        } else {
+            getLogger().warn("smpp." + key + " not existed in props. This parameter set to default value " + defaultValue);
+            return defaultValue;
+        }
+    }
+
+    boolean toBoolean(String value) {
+        return ((value != null) && value.equalsIgnoreCase("true"));
+    }
+
+
+    private short getCodingGroupForMessageWithNonASCIIText(short defaultValue) {
+        int result = getIntFromInitValues("nonascii.message.data.group", defaultValue);
+        return (short) result;
+    }
+
+    private short getCodingGroupForMessageWithASCIIText(short defaultValue) {
+        int result = getIntFromInitValues("ascii.message.data.group", defaultValue);
+        return (short) result;
+    }
+
+    private boolean isContainOnlyAsciiChars(String text) {
+        return text.matches("[\\p{ASCII}]*");
+    }
+
+    private short getAlphabetForMessageWithNonASCIIText(short defaultValue) {
+        int result = getIntFromInitValues("nonascii.text.encoding", defaultValue);
+        return (short) result;
+    }
+
+    private short getAlphabetForMessageWithASCIIText(short defaultValue) {
+        int result = getIntFromInitValues("ascii.text.encoding", defaultValue);
+        return (short) result;
+    }
+    private int getIntFromInitValues(String key, int defaultValue) {
+        if (initParams.containsKey(key)) {
+            return Integer.parseInt(initParams.getProperty(key));
+        } else {
+            getLogger().warn("smpp." + key + " not existed in props. This parameter set to default value " + defaultValue);
+            return defaultValue;
+        }
     }
 
     protected void finalize() {
