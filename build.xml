@@ -84,7 +84,7 @@
     <!-- Create application JAR file -->
     <jar jarfile="${dist.home}/ru.elmsoft.sms.jar"
          basedir="${build.home}">
-         <fileset file="${basedir}/log4j.properties"/>
+         <fileset file="${basedir}/src/log4j.properties"/>
     </jar>
 
   </target>
