@@ -1,28 +1,18 @@
 package ru.elmsoft.sms.transport;
 
-import java.util.Properties;
-
+import com.objectxp.msg.*;
+import com.objectxp.msg.ems.EMSMessage;
+import com.objectxp.msg.ems.EMSText;
 import ru.elmsoft.sms.object.DeliveryReport;
 import ru.elmsoft.sms.object.SMSMessage;
 import ru.elmsoft.sms.object.SystemReport;
 import ru.elmsoft.sms.transport.listener.SmppMultiPartListener;
 
-import com.objectxp.msg.GsmAddress;
-import com.objectxp.msg.MessageEvent;
-import com.objectxp.msg.MessageEventListener;
-import com.objectxp.msg.MessageException;
-import com.objectxp.msg.SmppException;
-import com.objectxp.msg.SmppSmsService;
-import com.objectxp.msg.SmppStatus;
-import com.objectxp.msg.SmsMessage;
-import com.objectxp.msg.SmsService;
-import com.objectxp.msg.StatusReportMessage;
-import com.objectxp.msg.ems.EMSMessage;
-import com.objectxp.msg.ems.EMSText;
+import java.util.Properties;
 
 /**
  * 
- * Транспорт осущетсвляющий SMS обмен при помощи SMPP-протокола
+ * пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ SMS пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ SMPP-пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
  * 
  */
 public class SMPPTransport extends AbstractSMSTransport implements SMSTransport, MessageEventListener {
@@ -101,27 +91,15 @@ public class SMPPTransport extends AbstractSMSTransport implements SMSTransport,
                 SmppException err = (SmppException) event.getException();
                 switch (err.getCommandStatus()) {
                     case 88:
-                        return;
-
                     case 1:
-                        return;
-
                     case 10:
-                        return;
                     case 11:
-                        return;
                     case 12:
-                        return;
                     case 51:
-                        return;
                     case 52:
-                        return;
                     case 67:
-                        return;
                     case 98:
-                        return;
                     case 20:
-                        return;
                     default:
                         if (checkCustomPoisonedCode(Integer.toString(err.getCommandStatus()))) {
                             return;
@@ -150,37 +128,13 @@ public class SMPPTransport extends AbstractSMSTransport implements SMSTransport,
                         getLogger().debug("System event not sended " + event.toString());
                         return;
                     case 1:
-                        getLogger().debug("Change type System event to INFO " + event.toString());
-                        status = SystemReport.INFO;
-                        break;
                     case 10: /* 0x0A */
-                        getLogger().debug("Change type System event to INFO " + event.toString());
-                        status = SystemReport.INFO;
-                        break;
                     case 11: /* 0x0B */
-                        getLogger().debug("Change type System event to INFO " + event.toString());
-                        status = SystemReport.INFO;
-                        break;
                     case 12: /* 0x0C */
-                        getLogger().debug("Change type System event to INFO " + event.toString());
-                        status = SystemReport.INFO;
-                        break;
                     case 51: /* 0x33 */
-                        getLogger().debug("Change type System event to INFO " + event.toString());
-                        status = SystemReport.INFO;
-                        break;
                     case 52: /* 0x34 */
-                        getLogger().debug("Change type System event to INFO " + event.toString());
-                        status = SystemReport.INFO;
-                        break;
                     case 67: /* 0x43 */
-                        getLogger().debug("Change type System event to INFO " + event.toString());
-                        status = SystemReport.INFO;
-                        break;
                     case 98: /* 0x62 */
-                        getLogger().debug("Change type System event to INFO " + event.toString());
-                        status = SystemReport.INFO;
-                        break;
                     case 20: /* 0x14 */
                         getLogger().debug("Change type System event to INFO " + event.toString());
                         status = SystemReport.INFO;
@@ -321,7 +275,7 @@ public class SMPPTransport extends AbstractSMSTransport implements SMSTransport,
     }
 
     /**
-     * Инициализация транспорта. Для отбора параметров используется префикс smpp
+     * пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ. пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ smpp
      */
     public void init(Properties props) throws MessageException {
         createService();
@@ -349,7 +303,7 @@ public class SMPPTransport extends AbstractSMSTransport implements SMSTransport,
                 
             }
 
-            // список кодов ошибок, которые не должны привести к перезагруке (Poisoned Code)
+            // пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ (Poisoned Code)
             if (props.getProperty("smpp.message.poisoned.code.list") != null) {
                 poisonedCodeList=props.getProperty("smpp.message.poisoned.code.list");
             } else {
