@@ -10,11 +10,6 @@ import ru.elmsoft.sms.transport.listener.SmppMultiPartListener;
 
 import java.util.Properties;
 
-/**
- * 
- * ��������� �������������� SMS ����� ��� ������ SMPP-���������
- * 
- */
 public class SMPPTransport extends AbstractSMSTransport implements SMSTransport, MessageEventListener {
 
     //private long msfqfullTimeout;
