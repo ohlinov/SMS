@@ -36,816 +36,782 @@ import com.objectxp.msg.ems.EMSMessage;
 
 /**
  * Данный класс реализует базовые алгоритмы работы с транспортами
- * 
+ *
  * @author oleg
- * 
  */
 public abstract class AbstractSMSTransport implements SMSTransport, MessageEventListener {
 
-	private long DELAY = 0;
+    private long DELAY = 0;
 
-	private boolean isRestart = false;
+    private boolean isRestart = false;
 
-	private long connect_timeout = 120100;
+    private long connect_timeout = 120100;
 
-	protected static org.apache.log4j.Logger logger;
+    protected static org.apache.log4j.Logger logger;
 
-	protected List/* MessageEvent */listener = Collections.synchronizedList(new LinkedList());
+    protected List/* MessageEvent */listener = Collections.synchronizedList(new LinkedList());
 
-	protected List/* DeliveryReportEvent */listener_report = Collections.synchronizedList(new LinkedList());
+    protected List/* DeliveryReportEvent */listener_report = Collections.synchronizedList(new LinkedList());
 
-	protected List /* SystemReportListener */listener_system = Collections.synchronizedList(new LinkedList());
+    protected List /* SystemReportListener */listener_system = Collections.synchronizedList(new LinkedList());
 
-	protected Properties license = new Properties();
+    protected Properties license = new Properties();
 
-	protected Properties initParams = new Properties();
+    protected Properties initParams = new Properties();
 
-	private Timer timer = new Timer(true);
+    private Timer timer = new Timer(true);
 
-	private TimerTask isAliveTask = createTimerTask();
+    private TimerTask isAliveTask = createTimerTask();
 
-	private Properties initProperies;
+    private Properties initProperies;
 
-	private boolean isNotifySystemEvent = true;
+    private boolean isNotifySystemEvent = true;
 
-	private boolean isExternalStop;
-        
-        private BaseBillingFile billing;
+    private boolean isExternalStop;
 
-	protected abstract SmsService getService();
+    private BaseBillingFile billing;
 
-	private TimerTask createTimerTask() {
-		Logger.getLogger(AbstractSMSTransport.class).debug("Creating new timer....");
-		return new TimerTask() {
-			public void run() {
+    protected abstract SmsService getService();
 
-				try {
-					isNotifySystemEvent = false;
-					getLogger().debug("Running timer task");
-					if (!getService().isAlive()) {
-						getLogger().error("Service is not alive...");
-						if (isRestart && !isExternalStop) {
-							restart();
-						} else {
-							isNotifySystemEvent = true;
-							processSystemEvent(null, SystemReport.ERROR, "DEVICE_NOT_RESPONDING");
-						}
-					}
-				} catch (Exception err) {
-					getLogger().error(err);
-					isNotifySystemEvent = true;
-					err.printStackTrace();
-					getLogger().debug(null, err);
-					getLogger().debug("Send system event");
-					processSystemEvent(null, SystemReport.ERROR, "DEVICE_NOT_RESPONDING");
-				} finally {
-					isNotifySystemEvent = true;
-				}
-				// timer.schedule(isAliveTask, DELAY);
-			}
-		};
-	}
+    private TimerTask createTimerTask() {
+        Logger.getLogger(AbstractSMSTransport.class).debug("Creating new timer....");
+        return new TimerTask() {
+            public void run() {
 
-	protected abstract void createService();
+                try {
+                    isNotifySystemEvent = false;
+                    getLogger().debug("Running timer task");
+                    if (!getService().isAlive()) {
+                        getLogger().error("Service is not alive...");
+                        if (isRestart && !isExternalStop) {
+                            restart();
+                        } else {
+                            isNotifySystemEvent = true;
+                            processSystemEvent(null, SystemReport.ERROR, "DEVICE_NOT_RESPONDING");
+                        }
+                    }
+                } catch (Exception err) {
+                    getLogger().error(err);
+                    isNotifySystemEvent = true;
+                    err.printStackTrace();
+                    getLogger().debug(null, err);
+                    getLogger().debug("Send system event");
+                    processSystemEvent(null, SystemReport.ERROR, "DEVICE_NOT_RESPONDING");
+                } finally {
+                    isNotifySystemEvent = true;
+                }
+                // timer.schedule(isAliveTask, DELAY);
+            }
+        };
+    }
 
-	protected abstract void dropService();
+    protected abstract void createService();
 
-	public AbstractSMSTransport() {
-		super();
-		logger = Logger.getLogger(getClass());
-		logger.warn("Called default constructor. Please call method init!!!");
-	}
+    protected abstract void dropService();
 
-	/**
-	 * 
-	 * @param props
-	 *            параметры инициализации
-	 * @throws Exception -
-	 *             если происходит ошибка инициализации, недоступен сервис или
-	 *             любой другой ресурс описанный в настройках
-	 */
-	public AbstractSMSTransport(Properties props) throws Exception {
-		super();
-		logger = Logger.getLogger(getClass());
-		try {
-			// initProps = props;
-			init(props);
-		} catch (MessageException err) {
-			logger.error(err);
+    public AbstractSMSTransport() {
+        super();
+        logger = Logger.getLogger(getClass());
+        logger.warn("Called default constructor. Please call method init!!!");
+    }
 
-			err.printStackTrace();
-			getLogger().debug(null, err);
-			throw new Exception(err);
-		}
-	}
+    /**
+     * @param props параметры инициализации
+     * @throws Exception -
+     *                   если происходит ошибка инициализации, недоступен сервис или
+     *                   любой другой ресурс описанный в настройках
+     */
+    public AbstractSMSTransport(Properties props) throws Exception {
+        super();
+        logger = Logger.getLogger(getClass());
+        try {
+            // initProps = props;
+            init(props);
+        } catch (MessageException err) {
+            logger.error(err);
 
-	/**
-	 * Добавления слушателя о отчетах SMS
-	 */
-	public void addDeliveryReportListener(DeliveryReportListener listener) {
-		logger.info("Added listener delivery reports");
-		synchronized (listener) {
-			listener_report.add(listener);
-		}
+            err.printStackTrace();
+            getLogger().debug(null, err);
+            throw new Exception(err);
+        }
+    }
 
-	}
+    /**
+     * Добавления слушателя о отчетах SMS
+     */
+    public void addDeliveryReportListener(DeliveryReportListener listener) {
+        logger.info("Added listener delivery reports");
+        synchronized (listener) {
+            listener_report.add(listener);
+        }
 
-	/**
-	 * Добавление слушателя о входящих SMS
-	 */
-	public void addIncomeSMSListener(IncomeSMSListener listener) {
-		logger.info("Added income message listener ");
-		synchronized (listener) {
-			this.listener.add(listener);
-		}
+    }
 
-	}
+    /**
+     * Добавление слушателя о входящих SMS
+     */
+    public void addIncomeSMSListener(IncomeSMSListener listener) {
+        logger.info("Added income message listener ");
+        synchronized (listener) {
+            this.listener.add(listener);
+        }
 
-	/**
-	 * Добавление слушателя системных событий
-	 */
-	public void addSystemReportListener(SystemReportListener listener) {
-		logger.info("Added system event listener");
-		synchronized (listener_system) {
-			listener_system.add(listener);
-		}
+    }
 
-	}
+    /**
+     * Добавление слушателя системных событий
+     */
+    public void addSystemReportListener(SystemReportListener listener) {
+        logger.info("Added system event listener");
+        synchronized (listener_system) {
+            listener_system.add(listener);
+        }
 
-	/**
-	 * Инициализация транспорта. Данный метод необходимо вызвать, если для
-	 * создания транспорта использовался конструктор по умолчанию
-	 * 
-	 * @param props
-	 *            параметры инициализации
-	 * @throws Exception -
-	 *             если происходит ошибка инициализации, недоступен сервис или
-	 *             любой другой ресурс описанный в настройках
-	 */
-	public void init(Properties props) throws MessageException {
-		// synchronized (getService()) {
-		try {
-			isNotifySystemEvent = true;
-			initProperies = props;
-			getLogger().info("Init service");
-			logger.info("Loading file with license");
-			license.load(new FileInputStream(new File("license.txt")));
-			writeToLog(license);
-			getLogger().info("Init service propertyes");
-			writeToLog(props);
-			
-			getLogger().debug("Property billing.file value is =>" + props.getProperty("billing.file"));
-			if (props.getProperty("sms.manual.keepalive.interval") != null) {
-				DELAY = Long.parseLong(props.getProperty("sms.manual.keepalive.interval"));
-			} else {
-				logger.warn("sms.manual.keepalive.interval not setted in props. This parameter set to default value 0 (no timers)");
-			}
-			isRestart = false;
-			if (props.getProperty("sms.manual.keepalive.restart") != null) {
-				isRestart = props.getProperty("sms.manual.keepalive.restart").equals("yes");
-			}
-			if (props.getProperty("smpp.smpp.connector.timeout") != null) {
-				connect_timeout = Long.parseLong(props.getProperty("smpp.smpp.connector.timeout"));
-			} else {
-				logger.warn("smpp.smpp.connector.timeout not setted in props. This parameter set to default value 320000 ms");
-			}
-			if (props.getProperty("billing.file") != null) {
-				logger.info("Add billing listener");
-                                if (billing == null ){
-                                    
-                                    billing = new BaseBillingFile(/* props.getProperty("billing.file") */);
-                                    addDeliveryReportListener(billing);
-                                    addIncomeSMSListener(billing);
-                                    addSystemReportListener(billing);
-                                    logger.info("Billing listener added");
-                                }else{
-                                    logger.info("Billing listener created later and don't need add that another");
-                                }
-			} else {
-				logger.warn("Billing not configured");
-			}
-			
+    }
 
-		} catch (FileNotFoundException e) {
-			logger.error("License file not found", e);
-			e.printStackTrace();
-			getLogger().debug(null, e);
-			throw new MessageException(e.getMessage());
+    /**
+     * Инициализация транспорта. Данный метод необходимо вызвать, если для
+     * создания транспорта использовался конструктор по умолчанию
+     *
+     * @param props параметры инициализации
+     * @throws Exception -
+     *                   если происходит ошибка инициализации, недоступен сервис или
+     *                   любой другой ресурс описанный в настройках
+     */
+    public void init(Properties props) throws MessageException {
+        // synchronized (getService()) {
+        try {
+            isNotifySystemEvent = true;
+            initProperies = props;
+            getLogger().info("Init service");
+            logger.info("Loading file with license");
+            license.load(new FileInputStream(new File("license.txt")));
+            writeToLog(license);
+            getLogger().info("Init service propertyes");
+            writeToLog(props);
 
-		} catch (IOException e) {
-			logger.error("Error on load license", e);
-			e.printStackTrace();
-			getLogger().debug(null, e);
-			throw new MessageException(e.getMessage());
-		}
+            getLogger().debug("Property billing.file value is =>" + props.getProperty("billing.file"));
+            if (props.getProperty("sms.manual.keepalive.interval") != null) {
+                DELAY = Long.parseLong(props.getProperty("sms.manual.keepalive.interval"));
+            } else {
+                logger.warn("sms.manual.keepalive.interval not setted in props. This parameter set to default value 0 (no timers)");
+            }
+            isRestart = false;
+            if (props.getProperty("sms.manual.keepalive.restart") != null) {
+                isRestart = props.getProperty("sms.manual.keepalive.restart").equals("yes");
+            }
+            if (props.getProperty("smpp.smpp.connector.timeout") != null) {
+                connect_timeout = Long.parseLong(props.getProperty("smpp.smpp.connector.timeout"));
+            } else {
+                logger.warn("smpp.smpp.connector.timeout not setted in props. This parameter set to default value 320000 ms");
+            }
+            if (props.getProperty("billing.file") != null) {
+                logger.info("Add billing listener");
+                if (billing == null) {
 
-	}
+                    billing = new BaseBillingFile(/* props.getProperty("billing.file") */);
+                    addDeliveryReportListener(billing);
+                    addIncomeSMSListener(billing);
+                    addSystemReportListener(billing);
+                    logger.info("Billing listener added");
+                } else {
+                    logger.info("Billing listener created later and don't need add that another");
+                }
+            } else {
+                logger.warn("Billing not configured");
+            }
 
-	/**
-	 * Обработка входящих параметров
-	 * 
-	 * @param props
-	 *            параметры из конфигурационного файла
-	 * @param prefix
-	 *            префикс. Для фильтрации параметров
-	 */
-	protected void processInitParams(Properties props, String prefix) {
-		logger.info("Process init params");
-		writeToLog(props);
-		initParams.clear();
-		logger.info("Process init params only with this prefix => " + prefix);
-		Enumeration keys = props.keys();
-		while (keys.hasMoreElements()) {
-			String sKey = (String) keys.nextElement();
-			if (sKey.startsWith(prefix))
-				initParams.put(sKey.substring(prefix.length()), props.get(sKey));
-		}
-		logger.info("Choosing init params");
-		writeToLog(initParams);
-	}
 
-	/**
-	 * Вывод параметров конфигурации в файл
-	 * 
-	 * @param props
-	 *            значения параметров конфигурации
-	 */
-	private void writeToLog(Properties props) {
-		Enumeration enums = props.keys();
-		while (enums.hasMoreElements()) {
-			String key = (String) enums.nextElement();
-			logger.info(key + "=" + (String) props.getProperty(key));
-		}
-	}
+        } catch (FileNotFoundException e) {
+            logger.error("License file not found", e);
+            e.printStackTrace();
+            getLogger().debug(null, e);
+            throw new MessageException(e.getMessage());
 
-	/**
-	 * Вывод в лог параметров SMS
-	 * 
-	 * @param message
-	 *            сообщение
-	 * @param comment
-	 *            комментарий
-	 */
-	protected void logMessage(SMSMessage message, String comment) {
-		logger.info(comment);
-		logger.info("MessageID=>" + message.getMessageID());
-		logger.info("UDH=>" + message.getUDH());
-		// logger.info("SMSC=>" + message.getSMSC());
-		logger.info("PhoneNumberFrom=>" + message.getPhoneNumberFrom());
-		logger.info("PhoneNumberTo=>" + message.getPhoneNumberTo());
-		logger.info("Data=>" + message.getData());
-		logger.info("Expiry" + Long.toString(message.getExpiry()));
-		if (message.getExpiryDate() == null)
-			logger.info("ExpiryDate is not assigned");
-		else
-			logger.info("ExpiryDate is assigned.");
-		logger.info(message.getSendedID());
-	}
+        } catch (IOException e) {
+            logger.error("Error on load license", e);
+            e.printStackTrace();
+            getLogger().debug(null, e);
+            throw new MessageException(e.getMessage());
+        }
 
-	/**
-	 * Извещение слушателей входящих сообщений о пришедшем сообщении
-	 * 
-	 * @param message
-	 *            SMS сообщение
-	 */
-	protected void notifyAllIncomeMessageListener(SMSMessage message) {
-		getLogger().debug("Income message " + message.toString());
-		synchronized (listener) {
-			Iterator iter = listener.iterator();
-			while (iter.hasNext()) {
-				IncomeSMSListener element = (IncomeSMSListener) iter.next();
-				getLogger().debug("Sent event to  " + element);
-				element.receiveIncomeSMS(message);
-			}
-		}
-	}
+    }
 
-	/**
-	 * Извещение слушателей отчетов о сообщениях о пришедшем отчете
-	 * 
-	 * @param report
-	 *            Delivery report
-	 */
-	protected void notifyAllDLRListener(DeliveryReport report) {
-		getLogger().debug("notifyAllDLRListener report" + report.toString());
-		synchronized (listener_report) {
+    /**
+     * Обработка входящих параметров
+     *
+     * @param props  параметры из конфигурационного файла
+     * @param prefix префикс. Для фильтрации параметров
+     */
+    protected void processInitParams(Properties props, String prefix) {
+        logger.info("Process init params");
+        writeToLog(props);
+        initParams.clear();
+        logger.info("Process init params only with this prefix => " + prefix);
+        Enumeration keys = props.keys();
+        while (keys.hasMoreElements()) {
+            String sKey = (String) keys.nextElement();
+            if (sKey.startsWith(prefix))
+                initParams.put(sKey.substring(prefix.length()), props.get(sKey));
+        }
+        logger.info("Choosing init params");
+        writeToLog(initParams);
+    }
 
-			Iterator iter = listener_report.iterator();
-			while (iter.hasNext()) {
+    /**
+     * Вывод параметров конфигурации в файл
+     *
+     * @param props значения параметров конфигурации
+     */
+    private void writeToLog(Properties props) {
+        Enumeration enums = props.keys();
+        while (enums.hasMoreElements()) {
+            String key = (String) enums.nextElement();
+            logger.info(key + "=" + (String) props.getProperty(key));
+        }
+    }
 
-				DeliveryReportListener element = (DeliveryReportListener) iter.next();
-				getLogger().debug("Sent event to " + element.toString());
-				element.receiveDeliveryReport(report);
-			}
-		}
-	}
+    /**
+     * Вывод в лог параметров SMS
+     *
+     * @param message сообщение
+     * @param comment комментарий
+     */
+    protected void logMessage(SMSMessage message, String comment) {
+        logger.info(comment);
+        logger.info("MessageID=>" + message.getMessageID());
+        logger.info("UDH=>" + message.getUDH());
+        // logger.info("SMSC=>" + message.getSMSC());
+        logger.info("PhoneNumberFrom=>" + message.getPhoneNumberFrom());
+        logger.info("PhoneNumberTo=>" + message.getPhoneNumberTo());
+        logger.info("Data=>" + message.getData());
+        logger.info("Expiry" + Long.toString(message.getExpiry()));
+        if (message.getExpiryDate() == null)
+            logger.info("ExpiryDate is not assigned");
+        else
+            logger.info("ExpiryDate is assigned.");
+        logger.info(message.getSendedID());
+    }
 
-	/**
-	 * Извещение слушателей о системных событиях
-	 * 
-	 * @param message
-	 *            Delivery report
-	 */
-	protected void notifyAllSystemEventListener(SystemReport message) {
-		if (!isNotifySystemEvent) {
-			getLogger().debug("System event report blocked");
-			return;
-		}
-		getLogger().debug("System report notify" + message.toString());
-		/*
-		 * if (message.getStatus()==-1) { if (isAliveTask !=
-		 * null)isAliveTask.cancel(); }
-		 * 
-		 * if (message.getStatus()==1 || message.getStatus()==0) { try {
-		 * restartTimer(); } catch (Exception err) { err.printStackTrace();
-		 * getLogger().debug(null, err); getLogger().error("Error on restarting
-		 * timer."); } }
-		 */
+    /**
+     * Извещение слушателей входящих сообщений о пришедшем сообщении
+     *
+     * @param message SMS сообщение
+     */
+    protected void notifyAllIncomeMessageListener(SMSMessage message) {
+        getLogger().debug("Income message " + message.toString());
+        synchronized (listener) {
+            Iterator iter = listener.iterator();
+            while (iter.hasNext()) {
+                IncomeSMSListener element = (IncomeSMSListener) iter.next();
+                getLogger().debug("Sent event to  " + element);
+                element.receiveIncomeSMS(message);
+            }
+        }
+    }
 
-		synchronized (listener_system) {
+    /**
+     * Извещение слушателей отчетов о сообщениях о пришедшем отчете
+     *
+     * @param report Delivery report
+     */
+    protected void notifyAllDLRListener(DeliveryReport report) {
+        getLogger().debug("notifyAllDLRListener report" + report.toString());
+        synchronized (listener_report) {
 
-			Iterator iter = listener_system.iterator();
-			while (iter.hasNext()) {
+            Iterator iter = listener_report.iterator();
+            while (iter.hasNext()) {
 
-				SystemReportListener element = (SystemReportListener) iter.next();
-				getLogger().debug("Sent event to " + element.toString());
-				try {
-					element.receiveSystemReport(message);
-				} catch (Exception err) {
-					getLogger().error(err);
-					getLogger().debug(null, err);
-					err.printStackTrace();
-				}
-			}
-		}
-	}
+                DeliveryReportListener element = (DeliveryReportListener) iter.next();
+                getLogger().debug("Sent event to " + element.toString());
+                element.receiveDeliveryReport(report);
+            }
+        }
+    }
 
-	/**
-	 * Обработка события о входящем сообщении. В результате чего формируется
-	 * объект пригодный для отправки в адаптер
-	 * 
-	 * @param event
-	 *            Описание входящего сообщения
-	 */
-	protected void processMessageReceived(MessageEvent event) {
+    /**
+     * Извещение слушателей о системных событиях
+     *
+     * @param message Delivery report
+     */
+    protected void notifyAllSystemEventListener(SystemReport message) {
+        if (!isNotifySystemEvent) {
+            getLogger().debug("System event report blocked");
+            return;
+        }
+        getLogger().debug("System report notify" + message.toString());
 
-		SMSMessage message = new SMSMessage();
-		message.setSendedID(event.getMessage().getID());
-		// getLogger().debug("Message has data coding => " +
-		// (SMSMessage)event.getMessage() )
-		try {
-			getLogger().debug("Dump message " + GsmHelper.encodeIA5(event.getMessage().getBytes()));
-		} catch (NullPointerException err) {
-			getLogger().debug("Message is empty !!!");
-		}
-		message.setMessage(event.getMessage().getMessage());
-		message.setPhoneNumberFrom(event.getMessage().getSender());
-		message.setPhoneNumberTo(event.getMessage().getRecipient());
-		notifyAllIncomeMessageListener(message);
-	}
 
-	/**
-	 * Обработка системного события. Преобразование в системное событие для
-	 * объект, который может быть проанализирован адаптером
-	 * 
-	 * @param event
-	 *            Описание входящего сообщения
-	 */
-	protected void processSystemEvent(MessageEvent event, int status, String message) {
-		SystemReport report = new SystemReport(event != null ? event.getType() : 2, status, message, event);
+        synchronized (listener_system) {
 
-		notifyAllSystemEventListener(report);
-		getLogger().debug("System event=>" + event != null ? event.toString() : "null");
-	}
+            Iterator iter = listener_system.iterator();
+            while (iter.hasNext()) {
 
-	/**
-	 * Обработка отчета о доставке (Delivery report). Преобразование в системное
-	 * событие для объект, который может быть проанализирован адаптером
-	 * 
-	 * @param event
-	 *            Описание входящего сообщения
-	 */
-	protected abstract void processStatusReport(MessageEvent event);
+                SystemReportListener element = (SystemReportListener) iter.next();
+                getLogger().debug("Sent event to " + element.toString());
+                try {
+                    element.receiveSystemReport(message);
+                } catch (Exception err) {
+                    getLogger().error(err);
+                    getLogger().debug(null, err);
+                    err.printStackTrace();
+                }
+            }
+        }
+    }
 
-	/**
-	 * извещение о пришедших dlr. Отчет о доставке будет допущен слушателям если
-	 * он не запрещен по маске. Маска настровивается в конфигурационном файле
-	 * 
-	 * @param msg
-	 *            сообщение
-	 * @param report
-	 * @param key -
-	 *            наименование маски
-	 * @param code
-	 *            код сообщения
-	 */
-	protected void notifyDeliveryReport(StatusReportMessage msg, DeliveryReport report, String key, int code) {
-		logger.info("Delivery Report");
-		logger.info(msg.getMessage());
-		logger.info("Name Mask=>" + key);
-		logger.info("State=>" + key);
-		if (initParams.containsKey(key)) {
-			if (!initParams.get(key).equals("true")) {
-				return;
-			}
-		}
-		report.setStateNumeric(code);
-		report.setStateString(msg.getMessage());
-		notifyAllDLRListener(report);
+    /**
+     * Обработка события о входящем сообщении. В результате чего формируется
+     * объект пригодный для отправки в адаптер
+     *
+     * @param event Описание входящего сообщения
+     */
+    protected void processMessageReceived(MessageEvent event) {
 
-		return;
-	}
+        SMSMessage message = new SMSMessage();
+        message.setSendedID(event.getMessage().getID());
+        // getLogger().debug("Message has data coding => " +
+        // (SMSMessage)event.getMessage() )
+        try {
+            getLogger().debug("Dump message " + GsmHelper.encodeIA5(event.getMessage().getBytes()));
+        } catch (NullPointerException err) {
+            getLogger().debug("Message is empty !!!");
+        }
+        message.setMessage(event.getMessage().getMessage());
+        message.setPhoneNumberFrom(event.getMessage().getSender());
+        message.setPhoneNumberTo(event.getMessage().getRecipient());
+        notifyAllIncomeMessageListener(message);
+    }
 
-	/**
-	 * остановка транспорта
-	 */
-	protected synchronized void stopService() {
-		getLogger().debug("Stop service");
+    /**
+     * Обработка системного события. Преобразование в системное событие для
+     * объект, который может быть проанализирован адаптером
+     *
+     * @param event Описание входящего сообщения
+     */
+    protected void processSystemEvent(MessageEvent event, int status, String message) {
+        SystemReport report = new SystemReport(event != null ? event.getType() : 2, status, message, event);
 
-		if (getService() == null) {
-			getLogger().error("Service is not initialized");
-			return;
-		}
-		synchronized (getService()) {
+        notifyAllSystemEventListener(report);
+        getLogger().debug("System event=>" + event != null ? event.toString() : "null");
+    }
 
-			try {
-				// canChangeState = false;
-				getService().stopReceiving();
-				if (getService().isConnected()) {
-	               			if (!getService().isInitialized()) {
-                                                getLogger().debug("BIG PROBLEM!!!");
+    /**
+     * Обработка отчета о доставке (Delivery report). Преобразование в системное
+     * событие для объект, который может быть проанализирован адаптером
+     *
+     * @param event Описание входящего сообщения
+     */
+    protected abstract void processStatusReport(MessageEvent event);
 
-                                    		try {
-                                    			Properties initProps = new Properties();
-                                    			initProps.putAll(license);
-                                      			initProps.putAll(initParams);
-                                       			getService().init(initProps);
-                                                } catch (Exception err) {
-              						getLogger().error(err);
-	          					getLogger().debug(null, err);
-		        				err.printStackTrace();
-                                                }
-     				        }
-					try {
-						getService().disconnect();
-					} catch (MessageException err) {
-						getLogger().error(err);
-						getLogger().debug(null, err);
-						err.printStackTrace();
-					}
-				} else {
-					getLogger().warn("Service already stopped");
-				}
-			} catch (NullPointerException err) {
-				getLogger().error(err);
-				getLogger().debug(null, err);
-				err.printStackTrace();
-			} finally {
-				getService().destroy();
-				getLogger().info("Connection closed!!!");
-				dropService();
-				stopTimer();
-				// canChangeState = true;
-			}
-		}
-	}
+    /**
+     * извещение о пришедших dlr. Отчет о доставке будет допущен слушателям если
+     * он не запрещен по маске. Маска настровивается в конфигурационном файле
+     *
+     * @param msg    сообщение
+     * @param report
+     * @param key    -
+     *               наименование маски
+     * @param code   код сообщения
+     */
+    protected void notifyDeliveryReport(StatusReportMessage msg, DeliveryReport report, String key, int code) {
+        logger.info("Delivery Report");
+        logger.info(msg.getMessage());
+        logger.info("Name Mask=>" + key);
+        logger.info("State=>" + key);
+        if (initParams.containsKey(key)) {
+            if (!initParams.get(key).equals("true")) {
+                return;
+            }
+        }
+        report.setStateNumeric(code);
+        report.setStateString(msg.getMessage());
+        notifyAllDLRListener(report);
 
-	protected void stopTimer() {
-		getLogger().info("stop timer");
-		if (isAliveTask != null)
-			isAliveTask.cancel();
-		isAliveTask = null;
-	}
+        return;
+    }
 
-	public synchronized void stop() {
-		setExternalStopFlag(true);
-		stopService();
-	}
+    /**
+     * остановка транспорта
+     */
+    protected synchronized void stopService() {
+        getLogger().debug("Stop service");
 
-	/**
-	 * перезапуск транспорта
-	 * 
-	 * @throws
-	 * 
-	 */
-	public void restart() throws MessageException {
-		// synchronized (logger) {
-		getLogger().info("Restart service");
+        if (getService() == null) {
+            getLogger().error("Service is not initialized");
+            return;
+        }
+        synchronized (getService()) {
 
-		if (getService() == null)
-			throw new MessageException("Service is not initialized");
+            try {
+                // canChangeState = false;
+                getService().stopReceiving();
+                if (getService().isConnected()) {
+                    if (!getService().isInitialized()) {
+                        getLogger().debug("BIG PROBLEM!!!");
 
-		stopService();
+                        try {
+                            Properties initProps = new Properties();
+                            initProps.putAll(license);
+                            initProps.putAll(initParams);
+                            getService().init(initProps);
+                        } catch (Exception err) {
+                            getLogger().error(err);
+                            getLogger().debug(null, err);
+                            err.printStackTrace();
+                        }
+                    }
+                    try {
+                        getService().disconnect();
+                    } catch (MessageException err) {
+                        getLogger().error(err);
+                        getLogger().debug(null, err);
+                        err.printStackTrace();
+                    }
+                } else {
+                    getLogger().warn("Service already stopped");
+                }
+            } catch (NullPointerException err) {
+                getLogger().error(err);
+                getLogger().debug(null, err);
+                err.printStackTrace();
+            } finally {
+                getService().destroy();
+                getLogger().info("Connection closed!!!");
+                dropService();
+                stopTimer();
+                // canChangeState = true;
+            }
+        }
+    }
 
-		getLogger().info("wait " + connect_timeout + "ms");
-		try {
-			Thread.sleep(connect_timeout);
-		} catch (InterruptedException err1) {
-			err1.printStackTrace();
-			getLogger().debug(null, err1);
-		}
+    protected void stopTimer() {
+        getLogger().info("stop timer");
+        if (isAliveTask != null)
+            isAliveTask.cancel();
+        isAliveTask = null;
+    }
 
-		
+    public synchronized void stop() {
+        setExternalStopFlag(true);
+        stopService();
+    }
 
-		try {
-			if (!isExternalStop) {
-				init(initProperies);
-			} else {
-				logger.debug("ExternalStop flag is true. Skip start part of restart process."); 
-			}
-		} catch (IllegalStateException err) {
-			logger.error("Error on restarting ", err);
-			err.printStackTrace();
-			getLogger().debug(null, err);
-			throw new MessageException(err.getMessage());
-		} /*catch (IOException err) {
-			logger.error("Error on restarting", err);
+    /**
+     * перезапуск транспорта
+     *
+     * @throws
+     */
+    public void restart() throws MessageException {
+        // synchronized (logger) {
+        getLogger().info("Restart service");
+
+        if (getService() == null)
+            throw new MessageException("Service is not initialized");
+
+        stopService();
+
+        getLogger().info("wait " + connect_timeout + "ms");
+        try {
+            Thread.sleep(connect_timeout);
+        } catch (InterruptedException err1) {
+            err1.printStackTrace();
+            getLogger().debug(null, err1);
+        }
+
+
+        try {
+            if (!isExternalStop) {
+                init(initProperies);
+            } else {
+                logger.debug("ExternalStop flag is true. Skip start part of restart process.");
+            }
+        } catch (IllegalStateException err) {
+            logger.error("Error on restarting ", err);
+            err.printStackTrace();
+            getLogger().debug(null, err);
+            throw new MessageException(err.getMessage());
+        } /*catch (IOException err) {
+            logger.error("Error on restarting", err);
 			err.printStackTrace();
 			getLogger().debug(null, err);
 			throw new MessageException(err.getMessage());
 		}*/
 
-	}
+    }
 
-	/**
-	 * старт транспорта
-	 * 
-	 * @throws MessageException
-	 *             в случае если транспорт не удается перевести в рабочее
-	 *             стояние
-	 */
-	protected void startService() throws MessageException {
-		getLogger().debug("Start service");
+    /**
+     * старт транспорта
+     *
+     * @throws MessageException в случае если транспорт не удается перевести в рабочее
+     *                          стояние
+     */
+    protected void startService() throws MessageException {
+        getLogger().debug("Start service");
 
-		if (getService() == null)
-			throw new MessageException("Service is not initialized");
+        if (getService() == null)
+            throw new MessageException("Service is not initialized");
 
-		try {
+        try {
 
-			Properties initProps = new Properties();
-			initProps.putAll(license);
-			initProps.putAll(initParams);
-			getService().init(initProps);
+            Properties initProps = new Properties();
+            initProps.putAll(license);
+            initProps.putAll(initParams);
+            getService().init(initProps);
 
-			subscribeListener();
+            subscribeListener();
 
-			// getService().setKeepAliveInterval(0);
-			getLogger().debug("Connecting....");
-			// getService().isAlive();
-			getLogger().debug("Passed props into service");
-			writeToLog(getService().getProperties());
-			getService().connect();
-			getService().startReceiving();
-			try {
-				restartTimer();
-			} catch (Exception err) {
-				err.printStackTrace();
-				getLogger().debug(null, err);
-				getLogger().error("Error on restarting timer.");
-			}
+            // getService().setKeepAliveInterval(0);
+            getLogger().debug("Connecting....");
+            // getService().isAlive();
+            getLogger().debug("Passed props into service");
+            writeToLog(getService().getProperties());
+            getService().connect();
+            getService().startReceiving();
+            try {
+                restartTimer();
+            } catch (Exception err) {
+                err.printStackTrace();
+                getLogger().debug(null, err);
+                getLogger().error("Error on restarting timer.");
+            }
 
-		} catch (java.io.IOException e) {
-			logger.error("Error on init transport", e);
-			e.printStackTrace();
-			getLogger().debug(null, e);
-			throw new MessageException(e.getMessage());
-		} catch (java.lang.Exception e) {
-			logger.error("Error on init transport", e);
-			e.printStackTrace();
-			getLogger().debug(null, e);
-			throw new MessageException(e.getMessage());
-		}
+        } catch (java.io.IOException e) {
+            logger.error("Error on init transport", e);
+            e.printStackTrace();
+            getLogger().debug(null, e);
+            throw new MessageException(e.getMessage());
+        } catch (java.lang.Exception e) {
+            logger.error("Error on init transport", e);
+            e.printStackTrace();
+            getLogger().debug(null, e);
+            throw new MessageException(e.getMessage());
+        }
 
-	}
+    }
 
-	protected void subscribeListener() {
-		getService().addMessageEventListener(this);
-	}
+    protected void subscribeListener() {
+        getService().addMessageEventListener(this);
+    }
 
-	/**
-	 * Метод для приема системных событий от библиотеки jSMS
-	 */
-        
-	public void handleMessageEvent(MessageEvent event) {
-		// synchronized (getService()) {
-		// Thread.dumpStack();
-		switch (event.getType()) {
-		case MessageEvent.DEVICE_NOT_READY:
-			processSystemEvent(event, SystemReport.ERROR, "DEVICE_NOT_READY");
-			getLogger().debug("Generate Error system event");
-			break;
-		case MessageEvent.DEVICE_NOT_RESPONDING:
-			processSystemEvent(event, SystemReport.ERROR, "DEVICE_NOT_RESPONDING");
-			getLogger().debug("Device not response. Must be restart");
-			getLogger().debug("Generate Error system event");
-			/* restart(); */
-			break;
-		case MessageEvent.DEVICE_READY:
-			processSystemEvent(event, SystemReport.SUCCESS, "DEVICE_READY");
-			getLogger().debug("Generate SUCCESS system event");
-			break;
-		case MessageEvent.INCOMING_CALL:
-			processSystemEvent(event, SystemReport.INFO, "INCOMING_CALL");
-			getLogger().debug("Generate INFO system event");
-			break;
-		case MessageEvent.MESSAGE_NOT_SENT:
-			processSystemEvent(event, SystemReport.ERROR, "MESSAGE_NOT_SENT");
-                        
-			getLogger().debug("Generate ERROR system event");
-			logger.warn("Message not sent");
-			break;
+    /**
+     * Метод для приема системных событий от библиотеки jSMS
+     */
 
-		case MessageEvent.MESSAGE_RECEIVED:
-			logger.info("Message received");
-			Message msg = event.getMessage();
-			if (msg instanceof EMSMessage) {
-				logger.info("EMS message");
-			}
-			processMessageReceived(event);
-			restartTimer();
-			/*******************************************************************
-			 * DEBUG******* getLogger().debug(".TAG_SAR_TOTAL_SEGMENTS =>" +
-			 * ((SmppMessage)event.getMessage()).getOptionalParameter(SmppOptionalParameter.TAG_SAR_TOTAL_SEGMENTS) );
-			 * getLogger().debug(".TAG_SAR_SEGMENT_SEQNUM =>" +
-			 * ((SmppMessage)event.getMessage()).getOptionalParameter(SmppOptionalParameter.TAG_SAR_SEGMENT_SEQNUM) );
-			 * getLogger().debug(".TAG_SAR_MSG_REF_NUM =>" +
-			 * ((SmppMessage)event.getMessage()).getOptionalParameter(SmppOptionalParameter.TAG_SAR_MSG_REF_NUM) );
-			 * SmppMessage mesg = (SmppMessage)event.getMessage(); // if
-			 * (mesg.containsUserDataHeader()) { try { SmsHeader header =
-			 * SmsHeader.parseHeader(mesg.getUserDataHeader()); if
-			 * (mesg.getUserDataHeader()!=null)
-			 * getLogger().info(mesg.getUserDataHeader().length+"UDH length");
-			 * else getLogger().debug("UDH is null"); Enumeration enumer =
-			 * header.elements(); getLogger().debug("enumer =>" +
-			 * enumer.hasMoreElements()); while (enumer.hasMoreElements()) {
-			 * Object object = (Object) enumer.nextElement();
-			 * getLogger().debug(object); } } catch (HeaderParseException err) {
-			 * 
-			 * err.printStackTrace(); } //} DEBUG********
-			 ******************************************************************/
-			break;
+    public void handleMessageEvent(MessageEvent event) {
+        // synchronized (getService()) {
+        // Thread.dumpStack();
+        switch (event.getType()) {
+            case MessageEvent.DEVICE_NOT_READY:
+                processSystemEvent(event, SystemReport.ERROR, "DEVICE_NOT_READY");
+                getLogger().debug("Generate Error system event");
+                break;
+            case MessageEvent.DEVICE_NOT_RESPONDING:
+                processSystemEvent(event, SystemReport.ERROR, "DEVICE_NOT_RESPONDING");
+                getLogger().debug("Device not response. Must be restart");
+                getLogger().debug("Generate Error system event");
+            /* restart(); */
+                break;
+            case MessageEvent.DEVICE_READY:
+                processSystemEvent(event, SystemReport.SUCCESS, "DEVICE_READY");
+                getLogger().debug("Generate SUCCESS system event");
+                break;
+            case MessageEvent.INCOMING_CALL:
+                processSystemEvent(event, SystemReport.INFO, "INCOMING_CALL");
+                getLogger().debug("Generate INFO system event");
+                break;
+            case MessageEvent.MESSAGE_NOT_SENT:
+                processSystemEvent(event, SystemReport.ERROR, "MESSAGE_NOT_SENT");
 
-		case MessageEvent.MESSAGE_SENT:
-			logger.info("Event Type: Message Sent");
-			processSystemEvent(event, SystemReport.SUCCESS, "Message Sent");
-			getLogger().debug("Generate SUCCESS system event");
+                getLogger().debug("Generate ERROR system event");
+                logger.warn("Message not sent");
+                break;
 
-			restartTimer();
-			break;
-
-		case MessageEvent.MULTIPART_FAILURE:
-			logger.info("Event Type: not all parts of a MultipartMessage received within a certain time");
-			processSystemEvent(event, SystemReport.ERROR, "not all parts of a MultipartMessage received within a certain time");
-			getLogger().debug("Generate ERROR system event");
-			break;
-		case MessageEvent.NETWORK_DISCONNECTED:
-			logger.info("Event Type: Network registration not ready.");
-			processSystemEvent(event, SystemReport.ERROR, "Network registration not ready.");
-			getLogger().debug("Generate ERROR system event");
-			break;
-		case MessageEvent.RECEIVING_STARTED:
-			logger.info("Event Type: Receiving started");
-			processSystemEvent(event, SystemReport.SUCCESS, "Receiving started");
-			getLogger().debug("Generate SUCCESS system event");
-			break;
-		case MessageEvent.RECEIVING_STOPPED:
-			logger.info("Event Type: Receiving stopped");
-			processSystemEvent(event, SystemReport.ERROR, "Receiving stopped");
-			getLogger().debug("Generate ERROR system event");
-			break;
-		case MessageEvent.STATUS_RECEIVED:
-			logger.info("Event type: status report received");
-			processStatusReport(event);
-			restartTimer();
-			break;
-		default:
-			logger.info(event.toString());
-		}
-		// }
-	}
-
-	protected void restartTimer() {
-		getLogger().debug("Restarting timer");
-		try {
-			if (isAliveTask != null) {
-				isAliveTask.cancel();
-				isAliveTask = null;
-			}
-		} catch (IllegalStateException err) {
-			getLogger().error(err);
-			err.printStackTrace();
-			getLogger().debug(null, err);
-		}
-		try {
-			if (DELAY != 0) {
-				isAliveTask = createTimerTask();
-				timer.schedule(isAliveTask, DELAY, DELAY);
-			}
-		} catch (IllegalStateException err) {
-			getLogger().error(err);
-			err.printStackTrace();
-			getLogger().debug(null, err);
-		}
-	}
-
-	protected void setAdressParams(SMSMessage message, SmsMessage msg) throws EPoisonedMessageException {
-		if (message.getPhoneNumberTo() == null)
-			throw new EPoisonedMessageException("message.getPhoneNumberTo() is null");
-		msg.setRecipient(message.getPhoneNumberTo());
-	}
-
-	protected void setAdditionalParams(SMSMessage message, SmsMessage msg) {
-		msg.requestStatusReport(true);
-		if (message.getExpiryDate() == null)
-			msg.setValidityPeriod(message.getExpiry());
-		else
-			msg.setValidityPeriod(message.getExpiryDate());
-	}
-
-	protected SmsMessage createMessage(SMSMessage message) {
-		// проверим текст сообщения
-
-		SmsMessage msg = null;
-		msg = new SmsMessage();
-
-		getLogger().debug("Set msg id (setMessageId) =>" + message.getMessageID());
-		msg.setID(message.getMessageID());
-		if (!message.getMessage().matches("[\\p{ASCII}]*")) {
-			getLogger().debug("Message  has unicode symbols");
-			msg.setAlphabet(SmsMessage.DC_UCS2);
-			if (message.getType() == SMSMessage.MESSAGE_TEXT)
-				if (initParams.containsKey("message.encoding")) {
-					try {
-						// msg.setAlphabet(SmsMessage.DC_UCS2);
-						msg.setUserData(message.getMessage().getBytes(initParams.getProperty("message.encoding")));
-
-					} catch (UnsupportedEncodingException err) {
-						msg.setAlphabet(SmsMessage.DC_DEFAULT);
-						msg.setMessage(message.getMessage());
-						getLogger().debug("Encoding message not setted" + initParams.getProperty("message.encoding"));
-					}
-				} else {
-					msg.setMessage(message.getMessage());
-				}
-		} else {
-			getLogger().debug("Message  has only ascii symbols");
-			msg.setCodingGroup(SmsMessage.DC_GROUP_DATA);
-			msg.setAlphabet(SmsMessage.DC_DEFAULT);
-			msg.setMessage(message.getMessage());
-		}
-		if (message.getUDH() != null) {
-			if (message.getUDH().length > 0)
-				msg.setUserDataHeader(message.getUDH());
-		}
-		return msg;
-	}
-
-	/**
-	 * Отсылка SMS сообщения.
-	 * 
-	 * @param message
-	 *            SMS сообщение
-	 */
-	public synchronized void sendSMSMessage(SMSMessage message) throws MessageException, EPoisonedMessageException {
-
-		getLogger().info("Calling sendSMSMessage");
-		if (getService() == null){
-			throw new MessageException("Service is not initialized");
+            case MessageEvent.MESSAGE_RECEIVED:
+                logger.info("Message received");
+                Message msg = event.getMessage();
+                if (msg instanceof EMSMessage) {
+                    logger.info("EMS message");
                 }
+                processMessageReceived(event);
+                restartTimer();
+                /*******************************************************************
+                 * DEBUG******* getLogger().debug(".TAG_SAR_TOTAL_SEGMENTS =>" +
+                 * ((SmppMessage)event.getMessage()).getOptionalParameter(SmppOptionalParameter.TAG_SAR_TOTAL_SEGMENTS) );
+                 * getLogger().debug(".TAG_SAR_SEGMENT_SEQNUM =>" +
+                 * ((SmppMessage)event.getMessage()).getOptionalParameter(SmppOptionalParameter.TAG_SAR_SEGMENT_SEQNUM) );
+                 * getLogger().debug(".TAG_SAR_MSG_REF_NUM =>" +
+                 * ((SmppMessage)event.getMessage()).getOptionalParameter(SmppOptionalParameter.TAG_SAR_MSG_REF_NUM) );
+                 * SmppMessage mesg = (SmppMessage)event.getMessage(); // if
+                 * (mesg.containsUserDataHeader()) { try { SmsHeader header =
+                 * SmsHeader.parseHeader(mesg.getUserDataHeader()); if
+                 * (mesg.getUserDataHeader()!=null)
+                 * getLogger().info(mesg.getUserDataHeader().length+"UDH length");
+                 * else getLogger().debug("UDH is null"); Enumeration enumer =
+                 * header.elements(); getLogger().debug("enumer =>" +
+                 * enumer.hasMoreElements()); while (enumer.hasMoreElements()) {
+                 * Object object = (Object) enumer.nextElement();
+                 * getLogger().debug(object); } } catch (HeaderParseException err) {
+                 *
+                 * err.printStackTrace(); } //} DEBUG********
+                 ******************************************************************/
+                break;
 
-		// synchronized (getService()) {
+            case MessageEvent.MESSAGE_SENT:
+                logger.info("Event Type: Message Sent");
+                processSystemEvent(event, SystemReport.SUCCESS, "Message Sent");
+                getLogger().debug("Generate SUCCESS system event");
 
-		if (message == null){
-			throw new MessageException("message (input parameter) is null");
+                restartTimer();
+                break;
+
+            case MessageEvent.MULTIPART_FAILURE:
+                logger.info("Event Type: not all parts of a MultipartMessage received within a certain time");
+                processSystemEvent(event, SystemReport.ERROR, "not all parts of a MultipartMessage received within a certain time");
+                getLogger().debug("Generate ERROR system event");
+                break;
+            case MessageEvent.NETWORK_DISCONNECTED:
+                logger.info("Event Type: Network registration not ready.");
+                processSystemEvent(event, SystemReport.ERROR, "Network registration not ready.");
+                getLogger().debug("Generate ERROR system event");
+                break;
+            case MessageEvent.RECEIVING_STARTED:
+                logger.info("Event Type: Receiving started");
+                processSystemEvent(event, SystemReport.SUCCESS, "Receiving started");
+                getLogger().debug("Generate SUCCESS system event");
+                break;
+            case MessageEvent.RECEIVING_STOPPED:
+                logger.info("Event Type: Receiving stopped");
+                processSystemEvent(event, SystemReport.ERROR, "Receiving stopped");
+                getLogger().debug("Generate ERROR system event");
+                break;
+            case MessageEvent.STATUS_RECEIVED:
+                logger.info("Event type: status report received");
+                processStatusReport(event);
+                restartTimer();
+                break;
+            default:
+                logger.info(event.toString());
+        }
+        // }
+    }
+
+    protected void restartTimer() {
+        getLogger().debug("Restarting timer");
+        try {
+            if (isAliveTask != null) {
+                isAliveTask.cancel();
+                isAliveTask = null;
+            }
+        } catch (IllegalStateException err) {
+            getLogger().error(err);
+            err.printStackTrace();
+            getLogger().debug(null, err);
+        }
+        try {
+            if (DELAY != 0) {
+                isAliveTask = createTimerTask();
+                timer.schedule(isAliveTask, DELAY, DELAY);
+            }
+        } catch (IllegalStateException err) {
+            getLogger().error(err);
+            err.printStackTrace();
+            getLogger().debug(null, err);
+        }
+    }
+
+    protected void setAdressParams(SMSMessage message, SmsMessage msg) throws EPoisonedMessageException {
+        if (message.getPhoneNumberTo() == null)
+            throw new EPoisonedMessageException("message.getPhoneNumberTo() is null");
+        msg.setRecipient(message.getPhoneNumberTo());
+    }
+
+    protected void setAdditionalParams(SMSMessage message, SmsMessage msg) {
+        msg.requestStatusReport(true);
+        if (message.getExpiryDate() == null)
+            msg.setValidityPeriod(message.getExpiry());
+        else
+            msg.setValidityPeriod(message.getExpiryDate());
+    }
+
+    protected SmsMessage createMessage(SMSMessage message) {
+        // проверим текст сообщения
+
+        SmsMessage msg = new SmsMessage();
+
+        getLogger().debug("Set msg id (setMessageId) =>" + message.getMessageID());
+        msg.setID(message.getMessageID());
+        if (!message.getMessage().matches("[\\p{ASCII}]*")) {
+            getLogger().debug("Message  has unicode symbols");
+            msg.setAlphabet(SmsMessage.DC_UCS2);
+            if (message.getType() == SMSMessage.MESSAGE_TEXT)
+                if (initParams.containsKey("message.encoding")) {
+                    try {
+                        // msg.setAlphabet(SmsMessage.DC_UCS2);
+                        msg.setUserData(message.getMessage().getBytes(initParams.getProperty("message.encoding")));
+
+                    } catch (UnsupportedEncodingException err) {
+                        msg.setAlphabet(SmsMessage.DC_DEFAULT);
+                        msg.setMessage(message.getMessage());
+                        getLogger().debug("Encoding message not setted" + initParams.getProperty("message.encoding"));
+                    }
+                } else {
+                    msg.setMessage(message.getMessage());
                 }
-		// checkConnected();
+        } else {
+            getLogger().debug("Message  has only ascii symbols");
+            msg.setCodingGroup(SmsMessage.DC_GROUP_DATA);
+            msg.setAlphabet(SmsMessage.DC_DEFAULT);
+            msg.setMessage(message.getMessage());
+        }
+        if (message.getUDH() != null) {
+            if (message.getUDH().length > 0)
+                msg.setUserDataHeader(message.getUDH());
+        }
+        return msg;
+    }
 
-		SmsMessage msg = createMessage(message);
+    /**
+     * Отсылка SMS сообщения.
+     *
+     * @param message SMS сообщение
+     */
+    public synchronized void sendSMSMessage(SMSMessage message) throws MessageException, EPoisonedMessageException {
+        if (getService() == null) {
+            throw new MessageException("Service is not initialized");
+        }
 
-		setAdressParams(message, msg);
-		setAdditionalParams(message, msg);
+        if (message == null) {
+            throw new MessageException("message (input parameter) is null");
+        }
 
-		getService().sendMessage(msg);
-		message.setSendedID(msg.getID());
-		logMessage(message, "Message sent with  ID " + msg.getID());
-		message.setSendedID(msg.getID());
-		if (!msg.requestStatusReport())
-			logger.info("Warning!!! Cant receive delivery report ");
-		// }
+        SmsMessage msg = createMessage(message);
 
-	}
+        setAdressParams(message, msg);
+        setAdditionalParams(message, msg);
 
-	protected void finalize() {
-		stop();
-		dropService();
-	}
+        getService().sendMessage(msg);
+        message.setSendedID(msg.getID());
+        logMessage(message, "Message sent with  ID " + msg.getID());
+        message.setSendedID(msg.getID());
+        if (!msg.requestStatusReport()) {
+            logger.info("Warning!!! Cant receive delivery report ");
+        }
 
-	protected org.apache.log4j.Logger getLogger() {
-		return logger;
-	}
+    }
 
-	protected void setExternalStopFlag(boolean value) {
-		getLogger().debug("Set extrernal stop flag to value => " + value);
-		isExternalStop = value;
-	}
+    protected void finalize() throws Throwable {
+        stop();
+        dropService();
+        super.finalize();
+    }
+
+    protected org.apache.log4j.Logger getLogger() {
+        return logger;
+    }
+
+    protected void setExternalStopFlag(boolean value) {
+        getLogger().debug("Set extrernal stop flag to value => " + value);
+        isExternalStop = value;
+    }
 }

@@ -12,19 +12,16 @@ import java.util.Properties;
 
 public class SMPPTransport extends AbstractSMSTransport implements SMSTransport, MessageEventListener {
 
-    //private long msfqfullTimeout;
     private long throttlingTimeout;
     private int maxLengthPartMessage;
     private String poisonedCodeList;
 
     public SMPPTransport(Properties props) throws Exception {
         super(props);
-    // service = new SmppSmsService();
     }
     public SMPPTransport() throws Exception {
         super();
         createService();
-    // service = new SmppSmsService();
     }
     private SmppSmsService service;
 
@@ -265,13 +262,6 @@ public class SMPPTransport extends AbstractSMSTransport implements SMSTransport,
         }
     }
 
-    protected void finalize() {
-
-    }
-
-    /**
-     * ������������� ����������. ��� ������ ���������� ������������ ������� smpp
-     */
     public void init(Properties props) throws MessageException {
         createService();
         synchronized (getService()) {
@@ -335,13 +325,12 @@ public class SMPPTransport extends AbstractSMSTransport implements SMSTransport,
         service = null;
     }
 
-    public synchronized void sendSMSMessage(SMSMessage message) throws MessageException, EPoisonedMessageException {
+    public void sendSMSMessage(SMSMessage message) throws MessageException, EPoisonedMessageException {
         try {
-            getLogger().info("Send SMPP message");
-
+            getLogger().info("Start sendSMSMessage");
             super.sendSMSMessage(message);
+            getLogger().info("End sendSMSMessage");
         } catch (SmppException err) {
-            err.printStackTrace();
             getLogger().error(err);
             getLogger().debug(null, err);
             getLogger().info(
@@ -401,6 +390,4 @@ public class SMPPTransport extends AbstractSMSTransport implements SMSTransport,
         listener.addListener(this);
         getService().addMessageEventListener(listener);
     }
-
-   
 }
