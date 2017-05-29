@@ -16,7 +16,7 @@ import com.objectxp.msg.StatusReportMessage;
 
 /**
  * 
- * Транспорт осущетсвляющий SMS обмен при помощи GSM-модема
+ * пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ SMS пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ GSM-пїЅпїЅпїЅпїЅпїЅпїЅ
  * 
  */
 public class GSMTransport extends AbstractSMSTransport implements MessageEventListener {
@@ -33,7 +33,7 @@ public class GSMTransport extends AbstractSMSTransport implements MessageEventLi
 	protected GsmSmsService service;// = new GsmSmsService();
 
 	/**
-	 * см. AbstractSMSTransport.init
+	 * пїЅпїЅ. AbstractSMSTransport.init
 	 */
 
 	public void init(Properties props) throws MessageException {
@@ -52,7 +52,7 @@ public class GSMTransport extends AbstractSMSTransport implements MessageEventLi
 		report.setDelivered(msg.getStatus().isDelivered());
 		report.setMessageId(msg.getID());
 		GsmStatus status = (GsmStatus) msg.getStatus();
-		logger.info("Report!!!! " + msg.getMessage() + " " + status.toString());
+		LOGGER.info("Report!!!! " + msg.getMessage() + " " + status.toString());
 		switch (status.getReasonCode()) {
 		case GsmStatus.SMS_RECEIVED_BY_RECIPIENT:
 			notifyDeliveryReport(msg, report, "dlr.SMS_RECEIVED_BY_RECIPIENT",

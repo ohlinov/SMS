@@ -1,38 +1,13 @@
 package ru.elmsoft.sms.transport;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Properties;
-import java.util.Timer;
-import java.util.TimerTask;
-
+import com.objectxp.msg.*;
+import com.objectxp.msg.ems.EMSMessage;
 import org.apache.log4j.Logger;
-
-import ru.elmsoft.sms.object.DeliveryReport;
-import ru.elmsoft.sms.object.DeliveryReportListener;
-import ru.elmsoft.sms.object.IncomeSMSListener;
-import ru.elmsoft.sms.object.SMSMessage;
-import ru.elmsoft.sms.object.SystemReport;
-import ru.elmsoft.sms.object.SystemReportListener;
+import ru.elmsoft.sms.object.*;
 import ru.elmsoft.sms.transport.billing.file.BaseBillingFile;
 
-import com.objectxp.msg.GsmHelper;
-import com.objectxp.msg.Message;
-import com.objectxp.msg.MessageEvent;
-import com.objectxp.msg.MessageEventListener;
-import com.objectxp.msg.MessageException;
-import com.objectxp.msg.SmsMessage;
-import com.objectxp.msg.SmsService;
-import com.objectxp.msg.StatusReportMessage;
-import com.objectxp.msg.ems.EMSMessage;
+import java.io.*;
+import java.util.*;
 
 /**
  * ƒанный класс реализует базовые алгоритмы работы с транспортами
@@ -41,31 +16,31 @@ import com.objectxp.msg.ems.EMSMessage;
  */
 public abstract class AbstractSMSTransport implements SMSTransport, MessageEventListener {
 
-    private long DELAY = 0;
+    private long delay;
 
     private boolean isRestart = false;
 
-    private long connect_timeout = 120100;
+    private long connectTimeout;
 
-    protected static org.apache.log4j.Logger logger;
+    protected org.apache.log4j.Logger LOGGER ;
 
-    protected List/* MessageEvent */listener = Collections.synchronizedList(new LinkedList());
+    private List/* MessageEvent */listener;
 
-    protected List/* DeliveryReportEvent */listener_report = Collections.synchronizedList(new LinkedList());
+    private List/* DeliveryReportEvent */listener_report;
 
-    protected List /* SystemReportListener */listener_system = Collections.synchronizedList(new LinkedList());
+    private List /* SystemReportListener */listener_system;
 
-    protected Properties license = new Properties();
+    private Properties license ;
 
-    protected Properties initParams = new Properties();
+    protected Properties initParams;
 
-    private Timer timer = new Timer(true);
+    private Timer timer;
 
-    private TimerTask isAliveTask = createTimerTask();
+    private TimerTask isAliveTask;
 
     private Properties initProperies;
 
-    private boolean isNotifySystemEvent = true;
+    private boolean isNotifySystemEvent;
 
     private boolean isExternalStop;
 
@@ -74,7 +49,7 @@ public abstract class AbstractSMSTransport implements SMSTransport, MessageEvent
     protected abstract SmsService getService();
 
     private TimerTask createTimerTask() {
-        Logger.getLogger(AbstractSMSTransport.class).debug("Creating new timer....");
+        getLogger().debug("Creating new timer....");
         return new TimerTask() {
             public void run() {
 
@@ -100,7 +75,7 @@ public abstract class AbstractSMSTransport implements SMSTransport, MessageEvent
                 } finally {
                     isNotifySystemEvent = true;
                 }
-                // timer.schedule(isAliveTask, DELAY);
+                // timer.schedule(isAliveTask, delay);
             }
         };
     }
@@ -110,9 +85,8 @@ public abstract class AbstractSMSTransport implements SMSTransport, MessageEvent
     protected abstract void dropService();
 
     public AbstractSMSTransport() {
-        super();
-        logger = Logger.getLogger(getClass());
-        logger.warn("Called default constructor. Please call method init!!!");
+        LOGGER = Logger.getLogger(getClass());
+        LOGGER.warn("Called default constructor. Please call method init!!!");
     }
 
     /**
@@ -122,16 +96,20 @@ public abstract class AbstractSMSTransport implements SMSTransport, MessageEvent
      *                   любой другой ресурс описанный в настройках
      */
     public AbstractSMSTransport(Properties props) throws Exception {
-        super();
-        logger = Logger.getLogger(getClass());
+        LOGGER = Logger.getLogger(getClass());
         try {
             // initProps = props;
+            listener = Collections.synchronizedList(new LinkedList());
+            listener_report = Collections.synchronizedList(new LinkedList());
+            Collections.synchronizedList(new LinkedList());
+            license = new Properties();
+            initParams = new Properties();
+            timer = new Timer(true);
+            isAliveTask = createTimerTask();
+            isNotifySystemEvent = true;
             init(props);
         } catch (MessageException err) {
-            logger.error(err);
-
-            err.printStackTrace();
-            getLogger().debug(null, err);
+            getLogger().error(err.getMessage(), err);
             throw new Exception(err);
         }
     }
@@ -139,34 +117,25 @@ public abstract class AbstractSMSTransport implements SMSTransport, MessageEvent
     /**
      * ƒобавлени€ слушател€ о отчетах SMS
      */
-    public void addDeliveryReportListener(DeliveryReportListener listener) {
-        logger.info("Added listener delivery reports");
-        synchronized (listener) {
-            listener_report.add(listener);
-        }
-
+    public synchronized void addDeliveryReportListener(DeliveryReportListener listener) {
+        LOGGER.info("Added listener delivery reports");
+        listener_report.add(listener);
     }
 
     /**
      * ƒобавление слушател€ о вход€щих SMS
      */
-    public void addIncomeSMSListener(IncomeSMSListener listener) {
-        logger.info("Added income message listener ");
-        synchronized (listener) {
-            this.listener.add(listener);
-        }
-
+    public synchronized void addIncomeSMSListener(IncomeSMSListener listener) {
+        LOGGER.info("Added income message listener ");
+        this.listener.add(listener);
     }
 
     /**
      * ƒобавление слушател€ системных событий
      */
-    public void addSystemReportListener(SystemReportListener listener) {
-        logger.info("Added system event listener");
-        synchronized (listener_system) {
-            listener_system.add(listener);
-        }
-
+    public synchronized void addSystemReportListener(SystemReportListener listener) {
+        LOGGER.info("Added system event listener");
+        listener_system.add(listener);
     }
 
     /**
@@ -174,17 +143,15 @@ public abstract class AbstractSMSTransport implements SMSTransport, MessageEvent
      * создани€ транспорта использовалс€ конструктор по умолчанию
      *
      * @param props параметры инициализации
-     * @throws Exception -
-     *                   если происходит ошибка инициализации, недоступен сервис или
+     * @throws MessageException -  если происходит ошибка инициализации, недоступен сервис или
      *                   любой другой ресурс описанный в настройках
      */
-    public void init(Properties props) throws MessageException {
-        // synchronized (getService()) {
+    public synchronized void init(Properties props) throws MessageException {
         try {
             isNotifySystemEvent = true;
             initProperies = props;
             getLogger().info("Init service");
-            logger.info("Loading file with license");
+            LOGGER.info("Loading file with license");
             license.load(new FileInputStream(new File("license.txt")));
             writeToLog(license);
             getLogger().info("Init service propertyes");
@@ -192,46 +159,41 @@ public abstract class AbstractSMSTransport implements SMSTransport, MessageEvent
 
             getLogger().debug("Property billing.file value is =>" + props.getProperty("billing.file"));
             if (props.getProperty("sms.manual.keepalive.interval") != null) {
-                DELAY = Long.parseLong(props.getProperty("sms.manual.keepalive.interval"));
+                delay = Long.parseLong(props.getProperty("sms.manual.keepalive.interval"));
             } else {
-                logger.warn("sms.manual.keepalive.interval not setted in props. This parameter set to default value 0 (no timers)");
+                LOGGER.warn("sms.manual.keepalive.interval not setted in props. This parameter set to default value 0 (no timers)");
+                delay = 0;
             }
             isRestart = false;
             if (props.getProperty("sms.manual.keepalive.restart") != null) {
                 isRestart = props.getProperty("sms.manual.keepalive.restart").equals("yes");
             }
             if (props.getProperty("smpp.smpp.connector.timeout") != null) {
-                connect_timeout = Long.parseLong(props.getProperty("smpp.smpp.connector.timeout"));
+                connectTimeout = Long.parseLong(props.getProperty("smpp.smpp.connector.timeout"));
             } else {
-                logger.warn("smpp.smpp.connector.timeout not setted in props. This parameter set to default value 320000 ms");
+                LOGGER.warn("smpp.smpp.connector.timeout not setted in props. This parameter set to default value 120 seconds");
+                connectTimeout = 120000L;
             }
             if (props.getProperty("billing.file") != null) {
-                logger.info("Add billing listener");
+                LOGGER.info("Add billing listener");
                 if (billing == null) {
-
-                    billing = new BaseBillingFile(/* props.getProperty("billing.file") */);
+                    billing = new BaseBillingFile();
                     addDeliveryReportListener(billing);
                     addIncomeSMSListener(billing);
                     addSystemReportListener(billing);
-                    logger.info("Billing listener added");
+                    LOGGER.info("Billing listener added");
                 } else {
-                    logger.info("Billing listener created later and don't need add that another");
+                    LOGGER.info("Billing listener created later and don't need add that another");
                 }
             } else {
-                logger.warn("Billing not configured");
+                LOGGER.warn("Billing not configured");
             }
-
-
         } catch (FileNotFoundException e) {
-            logger.error("License file not found", e);
-            e.printStackTrace();
-            getLogger().debug(null, e);
+            LOGGER.error("License file not found", e);
             throw new MessageException(e.getMessage());
 
         } catch (IOException e) {
-            logger.error("Error on load license", e);
-            e.printStackTrace();
-            getLogger().debug(null, e);
+            LOGGER.error("Error on load license", e);
             throw new MessageException(e.getMessage());
         }
 
@@ -244,17 +206,17 @@ public abstract class AbstractSMSTransport implements SMSTransport, MessageEvent
      * @param prefix префикс. ƒл€ фильтрации параметров
      */
     protected void processInitParams(Properties props, String prefix) {
-        logger.info("Process init params");
+        LOGGER.info("Process init params");
         writeToLog(props);
         initParams.clear();
-        logger.info("Process init params only with this prefix => " + prefix);
+        LOGGER.info("Process init params only with this prefix => " + prefix);
         Enumeration keys = props.keys();
         while (keys.hasMoreElements()) {
             String sKey = (String) keys.nextElement();
             if (sKey.startsWith(prefix))
                 initParams.put(sKey.substring(prefix.length()), props.get(sKey));
         }
-        logger.info("Choosing init params");
+        LOGGER.info("Choosing init params");
         writeToLog(initParams);
     }
 
@@ -267,7 +229,7 @@ public abstract class AbstractSMSTransport implements SMSTransport, MessageEvent
         Enumeration enums = props.keys();
         while (enums.hasMoreElements()) {
             String key = (String) enums.nextElement();
-            logger.info(key + "=" + (String) props.getProperty(key));
+            LOGGER.info(key + "=" + (String) props.getProperty(key));
         }
     }
 
@@ -278,19 +240,20 @@ public abstract class AbstractSMSTransport implements SMSTransport, MessageEvent
      * @param comment комментарий
      */
     protected void logMessage(SMSMessage message, String comment) {
-        logger.info(comment);
-        logger.info("MessageID=>" + message.getMessageID());
-        logger.info("UDH=>" + message.getUDH());
-        // logger.info("SMSC=>" + message.getSMSC());
-        logger.info("PhoneNumberFrom=>" + message.getPhoneNumberFrom());
-        logger.info("PhoneNumberTo=>" + message.getPhoneNumberTo());
-        logger.info("Data=>" + message.getData());
-        logger.info("Expiry" + Long.toString(message.getExpiry()));
+        LOGGER.info(comment);
+        LOGGER.info("MessageID=>" + message.getMessageID());
+      //  LOGGER.info("UDH=>" + message.getUDH());
+        // LOGGER.info("SMSC=>" + message.getSMSC());
+        LOGGER.info("PhoneNumberFrom=>" + message.getPhoneNumberFrom());
+        LOGGER.info("PhoneNumberTo=>" + message.getPhoneNumberTo());
+        LOGGER.info("message=>" + message.getMessage());
+        //LOGGER.info("Data=>" + message.getData());
+        LOGGER.info("Expiry" + Long.toString(message.getExpiry()));
         if (message.getExpiryDate() == null)
-            logger.info("ExpiryDate is not assigned");
+            LOGGER.info("ExpiryDate is not assigned");
         else
-            logger.info("ExpiryDate is assigned.");
-        logger.info(message.getSendedID());
+            LOGGER.info("ExpiryDate is assigned.");
+        LOGGER.info(message.getSendedID());
     }
 
     /**
@@ -300,13 +263,11 @@ public abstract class AbstractSMSTransport implements SMSTransport, MessageEvent
      */
     protected void notifyAllIncomeMessageListener(SMSMessage message) {
         getLogger().debug("Income message " + message.toString());
-        synchronized (listener) {
-            Iterator iter = listener.iterator();
-            while (iter.hasNext()) {
-                IncomeSMSListener element = (IncomeSMSListener) iter.next();
-                getLogger().debug("Sent event to  " + element);
-                element.receiveIncomeSMS(message);
-            }
+        Iterator iter = listener.iterator();
+        while (iter.hasNext()) {
+            IncomeSMSListener element = (IncomeSMSListener) iter.next();
+            getLogger().debug("Sent event to  " + element);
+            element.receiveIncomeSMS(message);
         }
     }
 
@@ -317,15 +278,11 @@ public abstract class AbstractSMSTransport implements SMSTransport, MessageEvent
      */
     protected void notifyAllDLRListener(DeliveryReport report) {
         getLogger().debug("notifyAllDLRListener report" + report.toString());
-        synchronized (listener_report) {
-
-            Iterator iter = listener_report.iterator();
-            while (iter.hasNext()) {
-
-                DeliveryReportListener element = (DeliveryReportListener) iter.next();
-                getLogger().debug("Sent event to " + element.toString());
-                element.receiveDeliveryReport(report);
-            }
+        Iterator iter = listener_report.iterator();
+        while (iter.hasNext()) {
+            DeliveryReportListener element = (DeliveryReportListener) iter.next();
+            getLogger().debug("Sent event to " + element.toString());
+            element.receiveDeliveryReport(report);
         }
     }
 
@@ -334,28 +291,23 @@ public abstract class AbstractSMSTransport implements SMSTransport, MessageEvent
      *
      * @param message Delivery report
      */
-    protected void notifyAllSystemEventListener(SystemReport message) {
+    private void notifyAllSystemEventListener(SystemReport message) {
         if (!isNotifySystemEvent) {
             getLogger().debug("System event report blocked");
             return;
         }
         getLogger().debug("System report notify" + message.toString());
 
-
-        synchronized (listener_system) {
-
-            Iterator iter = listener_system.iterator();
-            while (iter.hasNext()) {
-
-                SystemReportListener element = (SystemReportListener) iter.next();
-                getLogger().debug("Sent event to " + element.toString());
-                try {
-                    element.receiveSystemReport(message);
-                } catch (Exception err) {
-                    getLogger().error(err);
-                    getLogger().debug(null, err);
-                    err.printStackTrace();
-                }
+        Iterator iter = listener_system.iterator();
+        while (iter.hasNext()) {
+            SystemReportListener element = (SystemReportListener) iter.next();
+            getLogger().debug("Sent event to " + element.toString());
+            try {
+                element.receiveSystemReport(message);
+            } catch (Exception err) {
+                getLogger().error(err);
+                getLogger().debug(null, err);
+                err.printStackTrace();
             }
         }
     }
@@ -393,7 +345,7 @@ public abstract class AbstractSMSTransport implements SMSTransport, MessageEvent
         SystemReport report = new SystemReport(event != null ? event.getType() : 2, status, message, event);
 
         notifyAllSystemEventListener(report);
-        getLogger().debug("System event=>" + event != null ? event.toString() : "null");
+        getLogger().debug("System event=>" + (event != null ? event.toString() : "null"));
     }
 
     /**
@@ -415,10 +367,10 @@ public abstract class AbstractSMSTransport implements SMSTransport, MessageEvent
      * @param code   код сообщени€
      */
     protected void notifyDeliveryReport(StatusReportMessage msg, DeliveryReport report, String key, int code) {
-        logger.info("Delivery Report");
-        logger.info(msg.getMessage());
-        logger.info("Name Mask=>" + key);
-        logger.info("State=>" + key);
+        LOGGER.info("Delivery Report");
+        LOGGER.info(msg.getMessage());
+        LOGGER.info("Name Mask=>" + key);
+        LOGGER.info("State=>" + key);
         if (initParams.containsKey(key)) {
             if (!initParams.get(key).equals("true")) {
                 return;
@@ -427,14 +379,12 @@ public abstract class AbstractSMSTransport implements SMSTransport, MessageEvent
         report.setStateNumeric(code);
         report.setStateString(msg.getMessage());
         notifyAllDLRListener(report);
-
-        return;
     }
 
     /**
      * остановка транспорта
      */
-    protected synchronized void stopService() {
+    private synchronized void stopService() {
         getLogger().debug("Stop service");
 
         if (getService() == null) {
@@ -500,10 +450,10 @@ public abstract class AbstractSMSTransport implements SMSTransport, MessageEvent
     /**
      * перезапуск транспорта
      *
-     * @throws
+     * @throws MessageException если при перезапуск не состо€лс€
      */
     public void restart() throws MessageException {
-        // synchronized (logger) {
+        // synchronized (LOGGER) {
         getLogger().info("Restart service");
 
         if (getService() == null)
@@ -511,9 +461,9 @@ public abstract class AbstractSMSTransport implements SMSTransport, MessageEvent
 
         stopService();
 
-        getLogger().info("wait " + connect_timeout + "ms");
+        getLogger().info("wait " + connectTimeout + "ms");
         try {
-            Thread.sleep(connect_timeout);
+            Thread.sleep(connectTimeout);
         } catch (InterruptedException err1) {
             err1.printStackTrace();
             getLogger().debug(null, err1);
@@ -524,15 +474,13 @@ public abstract class AbstractSMSTransport implements SMSTransport, MessageEvent
             if (!isExternalStop) {
                 init(initProperies);
             } else {
-                logger.debug("ExternalStop flag is true. Skip start part of restart process.");
+                LOGGER.debug("ExternalStop flag is true. Skip start part of restart process.");
             }
         } catch (IllegalStateException err) {
-            logger.error("Error on restarting ", err);
-            err.printStackTrace();
-            getLogger().debug(null, err);
+            LOGGER.error("Error on restarting ", err);
             throw new MessageException(err.getMessage());
         } /*catch (IOException err) {
-            logger.error("Error on restarting", err);
+            LOGGER.error("Error on restarting", err);
 			err.printStackTrace();
 			getLogger().debug(null, err);
 			throw new MessageException(err.getMessage());
@@ -549,8 +497,9 @@ public abstract class AbstractSMSTransport implements SMSTransport, MessageEvent
     protected void startService() throws MessageException {
         getLogger().debug("Start service");
 
-        if (getService() == null)
+        if (getService() == null) {
             throw new MessageException("Service is not initialized");
+        }
 
         try {
 
@@ -571,20 +520,14 @@ public abstract class AbstractSMSTransport implements SMSTransport, MessageEvent
             try {
                 restartTimer();
             } catch (Exception err) {
-                err.printStackTrace();
-                getLogger().debug(null, err);
-                getLogger().error("Error on restarting timer.");
+                getLogger().error("Error on restarting timer.", err);
             }
 
         } catch (java.io.IOException e) {
-            logger.error("Error on init transport", e);
-            e.printStackTrace();
-            getLogger().debug(null, e);
+            LOGGER.error("Error on init transport", e);
             throw new MessageException(e.getMessage());
         } catch (java.lang.Exception e) {
-            logger.error("Error on init transport", e);
-            e.printStackTrace();
-            getLogger().debug(null, e);
+            LOGGER.error("Error on init transport", e);
             throw new MessageException(e.getMessage());
         }
 
@@ -620,80 +563,63 @@ public abstract class AbstractSMSTransport implements SMSTransport, MessageEvent
                 processSystemEvent(event, SystemReport.INFO, "INCOMING_CALL");
                 getLogger().debug("Generate INFO system event");
                 break;
-            case MessageEvent.MESSAGE_NOT_SENT:
-                processSystemEvent(event, SystemReport.ERROR, "MESSAGE_NOT_SENT");
-
-                getLogger().debug("Generate ERROR system event");
-                logger.warn("Message not sent");
-                break;
-
             case MessageEvent.MESSAGE_RECEIVED:
-                logger.info("Message received");
+                LOGGER.info("Message received");
                 Message msg = event.getMessage();
                 if (msg instanceof EMSMessage) {
-                    logger.info("EMS message");
+                    LOGGER.info("EMS message");
                 }
                 processMessageReceived(event);
                 restartTimer();
-                /*******************************************************************
-                 * DEBUG******* getLogger().debug(".TAG_SAR_TOTAL_SEGMENTS =>" +
-                 * ((SmppMessage)event.getMessage()).getOptionalParameter(SmppOptionalParameter.TAG_SAR_TOTAL_SEGMENTS) );
-                 * getLogger().debug(".TAG_SAR_SEGMENT_SEQNUM =>" +
-                 * ((SmppMessage)event.getMessage()).getOptionalParameter(SmppOptionalParameter.TAG_SAR_SEGMENT_SEQNUM) );
-                 * getLogger().debug(".TAG_SAR_MSG_REF_NUM =>" +
-                 * ((SmppMessage)event.getMessage()).getOptionalParameter(SmppOptionalParameter.TAG_SAR_MSG_REF_NUM) );
-                 * SmppMessage mesg = (SmppMessage)event.getMessage(); // if
-                 * (mesg.containsUserDataHeader()) { try { SmsHeader header =
-                 * SmsHeader.parseHeader(mesg.getUserDataHeader()); if
-                 * (mesg.getUserDataHeader()!=null)
-                 * getLogger().info(mesg.getUserDataHeader().length+"UDH length");
-                 * else getLogger().debug("UDH is null"); Enumeration enumer =
-                 * header.elements(); getLogger().debug("enumer =>" +
-                 * enumer.hasMoreElements()); while (enumer.hasMoreElements()) {
-                 * Object object = (Object) enumer.nextElement();
-                 * getLogger().debug(object); } } catch (HeaderParseException err) {
-                 *
-                 * err.printStackTrace(); } //} DEBUG********
-                 ******************************************************************/
+                break;
+
+            case MessageEvent.MESSAGE_NOT_SENT:
+                processSystemEvent(event, SystemReport.ERROR, "MESSAGE_NOT_SENT");
+                onMessageSentEvent(event, false);
+                getLogger().debug("Generate ERROR system event");
+                LOGGER.warn("Message not sent");
                 break;
 
             case MessageEvent.MESSAGE_SENT:
-                logger.info("Event Type: Message Sent");
-                processSystemEvent(event, SystemReport.SUCCESS, "Message Sent");
+                LOGGER.info("Event Type: Message Sent");
                 getLogger().debug("Generate SUCCESS system event");
-
+                onMessageSentEvent(event, true);
+                processSystemEvent(event, SystemReport.SUCCESS, "Message Sent");
                 restartTimer();
                 break;
 
             case MessageEvent.MULTIPART_FAILURE:
-                logger.info("Event Type: not all parts of a MultipartMessage received within a certain time");
+                LOGGER.info("Event Type: not all parts of a MultipartMessage received within a certain time");
                 processSystemEvent(event, SystemReport.ERROR, "not all parts of a MultipartMessage received within a certain time");
                 getLogger().debug("Generate ERROR system event");
                 break;
             case MessageEvent.NETWORK_DISCONNECTED:
-                logger.info("Event Type: Network registration not ready.");
+                LOGGER.info("Event Type: Network registration not ready.");
                 processSystemEvent(event, SystemReport.ERROR, "Network registration not ready.");
                 getLogger().debug("Generate ERROR system event");
                 break;
             case MessageEvent.RECEIVING_STARTED:
-                logger.info("Event Type: Receiving started");
+                LOGGER.info("Event Type: Receiving started");
                 processSystemEvent(event, SystemReport.SUCCESS, "Receiving started");
                 getLogger().debug("Generate SUCCESS system event");
                 break;
             case MessageEvent.RECEIVING_STOPPED:
-                logger.info("Event Type: Receiving stopped");
+                LOGGER.info("Event Type: Receiving stopped");
                 processSystemEvent(event, SystemReport.ERROR, "Receiving stopped");
                 getLogger().debug("Generate ERROR system event");
                 break;
             case MessageEvent.STATUS_RECEIVED:
-                logger.info("Event type: status report received");
+                LOGGER.info("Event type: status report received");
                 processStatusReport(event);
                 restartTimer();
                 break;
             default:
-                logger.info(event.toString());
+                LOGGER.info(event.toString());
         }
         // }
+    }
+
+    protected void onMessageSentEvent(MessageEvent event, boolean isSent) {
     }
 
     protected void restartTimer() {
@@ -709,9 +635,9 @@ public abstract class AbstractSMSTransport implements SMSTransport, MessageEvent
             getLogger().debug(null, err);
         }
         try {
-            if (DELAY != 0) {
+            if (delay != 0) {
                 isAliveTask = createTimerTask();
-                timer.schedule(isAliveTask, DELAY, DELAY);
+                timer.schedule(isAliveTask, delay, delay);
             }
         } catch (IllegalStateException err) {
             getLogger().error(err);
@@ -726,7 +652,7 @@ public abstract class AbstractSMSTransport implements SMSTransport, MessageEvent
         msg.setRecipient(message.getPhoneNumberTo());
     }
 
-    protected void setAdditionalParams(SMSMessage message, SmsMessage msg) {
+    private void setAdditionalParams(SMSMessage message, SmsMessage msg) {
         msg.requestStatusReport(true);
         if (message.getExpiryDate() == null)
             msg.setValidityPeriod(message.getExpiry());
@@ -795,7 +721,7 @@ public abstract class AbstractSMSTransport implements SMSTransport, MessageEvent
         logMessage(message, "Message sent with  ID " + msg.getID());
         message.setSendedID(msg.getID());
         if (!msg.requestStatusReport()) {
-            logger.info("Warning!!! Cant receive delivery report ");
+            LOGGER.info("Warning!!! Cant receive delivery report ");
         }
 
     }
@@ -807,7 +733,7 @@ public abstract class AbstractSMSTransport implements SMSTransport, MessageEvent
     }
 
     protected org.apache.log4j.Logger getLogger() {
-        return logger;
+        return LOGGER;
     }
 
     protected void setExternalStopFlag(boolean value) {

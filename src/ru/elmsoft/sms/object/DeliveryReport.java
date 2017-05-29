@@ -1,7 +1,7 @@
 package ru.elmsoft.sms.object;
 /**
  * 
- * отчет о доставке
+ * РѕС‚С‡РµС‚ Рѕ РґРѕСЃС‚Р°РІРєРµ
  *
  */
 public class DeliveryReport {
@@ -16,35 +16,35 @@ public class DeliveryReport {
 	private boolean IsPermanentError;
 /**
  * 
- * @return true если сообщение доставленно
+ * @return true РµСЃР»Рё СЃРѕРѕР±С‰РµРЅРёРµ РґРѕСЃС‚Р°РІР»РµРЅРЅРѕ
  */
 	public boolean isDelivered() {
 		return IsDelivered;
 	}
 /**
  * 
- * @return true если отчет содержит ошибку
+ * @return true РµСЃР»Рё РѕС‚С‡РµС‚ СЃРѕРґРµСЂР¶РёС‚ РѕС€РёР±РєСѓ
  */
 	public boolean isPermanentError() {
 		return IsPermanentError;
 	}
 /**
  * 
- * @return идентифатор сообщения, относительно которого пришел отчет
+ * @return РёРґРµРЅС‚РёС„Р°С‚РѕСЂ СЃРѕРѕР±С‰РµРЅРёСЏ, РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕ РєРѕС‚РѕСЂРѕРіРѕ РїСЂРёС€РµР» РѕС‚С‡РµС‚
  */
 	public String getMessageId() {
 		return MessageId;
 	}
 /**
  * 
- * @return код отчета
+ * @return РєРѕРґ РѕС‚С‡РµС‚Р°
  */
 	public int getStateNumeric() {
 		return StateNumeric;
 	}
 /**
  * 
- * @return словесное содержание отчета
+ * @return СЃР»РѕРІРµСЃРЅРѕРµ СЃРѕРґРµСЂР¶Р°РЅРёРµ РѕС‚С‡РµС‚Р°
  */
 	public String getStateString() {
 		return StateString;

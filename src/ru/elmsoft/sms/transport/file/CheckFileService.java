@@ -13,13 +13,13 @@ public class CheckFileService implements Runnable {
         File file = new File(nam_file);
         while(true){
             if (file.exists()){
-              //  logger.info("File exist:" + nam_file);
+              //  LOGGER.info("File exist:" + nam_file);
                 sendNotify(true);
             }else {
-               // logger.info("File not exist:" + nam_file);
+               // LOGGER.info("File not exist:" + nam_file);
                 sendNotify(false);
             }
-            synchronized (nam_file) {
+            synchronized (this) {
                 try {
                     nam_file.wait(1000);
                 } catch (InterruptedException err) {

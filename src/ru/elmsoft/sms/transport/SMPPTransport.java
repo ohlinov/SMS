@@ -27,13 +27,10 @@ public class SMPPTransport extends AbstractSMSTransport implements SMSTransport,
 
     protected void processStatusReport(MessageEvent event) {
         StatusReportMessage msg = (StatusReportMessage) event.getMessage();
-        DeliveryReport report = new DeliveryReport();
-        report.setPermanentError(msg.getStatus().isPermanentError());
-        report.setDelivered(msg.getStatus().isDelivered());
-        report.setMessageId(msg.getID());
+        DeliveryReport report = createDeliveryReport(msg);
 
         SmppStatus status = (SmppStatus) msg.getStatus();
-        logger.info("Report!!!! " + msg.getMessage() + " " + status.toString() + " " + msg.getID());
+        LOGGER.info("Report!!!! " + msg.getMessage() + " " + status.toString() + " " + msg.getID());
         switch (status.getMessageState()) {
             case SmppStatus.STATE_ACCEPTED:
                 notifyDeliveryReport(msg, report, "dlr.STATE_ACCEPTED", 4); // Message is in accepted state.
@@ -75,6 +72,14 @@ public class SMPPTransport extends AbstractSMSTransport implements SMSTransport,
             case SmppStatus.STATE_UNKNOWN:
                 notifyDeliveryReport(msg, report, "dlr.STATE_UNKNOWN", 2); // Message is undeliverable.
         }
+    }
+
+    protected DeliveryReport createDeliveryReport(StatusReportMessage msg) {
+        DeliveryReport report = new DeliveryReport();
+        report.setPermanentError(msg.getStatus().isPermanentError());
+        report.setDelivered(msg.getStatus().isDelivered());
+        report.setMessageId(msg.getID());
+        return report;
     }
 
     public void handleMessageEvent(MessageEvent event)  {
@@ -158,22 +163,22 @@ public class SMPPTransport extends AbstractSMSTransport implements SMSTransport,
         if (initParams.getProperty("smpp.destination.ton") != null) {
         	destAddressTON = Integer.parseInt(initParams.getProperty("smpp.destination.ton"));
 		} else {
-			logger.warn("smpp.smpp.destination.ton not setted in props. This parameter set to default value 1 ");
+			LOGGER.warn("smpp.smpp.destination.ton not setted in props. This parameter set to default value 1 ");
 		}
         if (initParams.getProperty("smpp.destination.npi") != null) {
         	destAddressNPI = Integer.parseInt(initParams.getProperty("smpp.destination.npi"));
 		} else {
-			logger.warn("smpp.smpp.destination.ton not setted in props. This parameter set to default value 1 ");
+			LOGGER.warn("smpp.smpp.destination.ton not setted in props. This parameter set to default value 1 ");
 		}
         if (initParams.getProperty("smpp.sender.ton") != null) {
         	sourceAddressTON = Integer.parseInt(initParams.getProperty("smpp.sender.ton"));
 		} else {
-			logger.warn("smpp.smpp.sender.ton not setted in props. This parameter set to default value 0 ");
+			LOGGER.warn("smpp.smpp.sender.ton not setted in props. This parameter set to default value 0 ");
 		}
         if (initParams.getProperty("smpp.sender.npi") != null) {
         	sourceAddressNPI = Integer.parseInt(initParams.getProperty("smpp.sender.npi"));
 		} else {
-			logger.warn("smpp.smpp.sender.npi not setted in props. This parameter set to default value 1 ");
+			LOGGER.warn("smpp.smpp.sender.npi not setted in props. This parameter set to default value 1 ");
 		}
         //GsmAddress(java.lang.String address, byte TON, byte NPI) 
         GsmAddress destAddress = new GsmAddress(message.getPhoneNumberTo(), (byte) destAddressTON, (byte) destAddressNPI);
@@ -271,29 +276,28 @@ public class SMPPTransport extends AbstractSMSTransport implements SMSTransport,
                 throttlingTimeout = Long.parseLong(props.getProperty("smpp.throttling.timeout"));
             } else {
                 throttlingTimeout=60010;
-                logger.warn("smpp.throttling.timeout not setted in props. This parameter set to default value 60s");
+                LOGGER.warn("smpp.throttling.timeout not setted in props. This parameter set to default value 60s");
             }
 
            /* if (props.getProperty("smpp.mqf.timeout") != null) {
                 msfqfullTimeout = Long.parseLong(props.getProperty("smpp.mqf.timeout"));
             } else {
-                logger.warn("smpp.mqf.timeout not setted in props. This parameter set to default value 60s");
+                LOGGER.warn("smpp.mqf.timeout not setted in props. This parameter set to default value 60s");
             }*/
 
             if (props.getProperty("smpp.message.max.length") != null) {
                 maxLengthPartMessage = Integer.parseInt(props.getProperty("smpp.message.max.length"));
             } else {
                 maxLengthPartMessage=(140-7)*2;
-                logger.warn("smpp.message.max.length not setted in props. This parameter set to default value " + maxLengthPartMessage);
+                LOGGER.warn("smpp.message.max.length not setted in props. This parameter set to default value " + maxLengthPartMessage);
                 
             }
 
-            // ������ ����� ������, ������� �� ������ �������� � ����������� (Poisoned Code)
             if (props.getProperty("smpp.message.poisoned.code.list") != null) {
                 poisonedCodeList=props.getProperty("smpp.message.poisoned.code.list");
             } else {
                 poisonedCodeList="";
-                logger.warn("smpp.message.poisoned.code.list not setted in props.");
+                LOGGER.warn("smpp.message.poisoned.code.list not setted in props.");
             }
             startService();
 

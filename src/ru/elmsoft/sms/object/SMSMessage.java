@@ -4,7 +4,7 @@ import java.util.Date;
 
 /**
  * 
- * SMS сообщение
+ * SMS СЃРѕРѕР±С‰РµРЅРёРµ
  *
  */
 public class SMSMessage {
@@ -34,33 +34,32 @@ public class SMSMessage {
 
 
 	public byte[] getData() {
-		if (type != SMSMessage.MESSAGE_BINARY) return null;
-		return data;
+		return type != SMSMessage.MESSAGE_BINARY ? null : data;
 	}
 /**
  * 
- * @return срок действия в часах
+ * @return СЃСЂРѕРє РґРµР№СЃС‚РІРёСЏ РІ С‡Р°СЃР°С…
  */
 	public int getExpiry() {
 		return expiry;
 	}
 /**
  * 
- * @return ид. сообщения
+ * @return РёРґ. СЃРѕРѕР±С‰РµРЅРёСЏ
  */
 	public String getMessageID() {
 		return messageID;
 	}
 /**
  * 
- * @return адрес отправителя
+ * @return Р°РґСЂРµСЃ РѕС‚РїСЂР°РІРёС‚РµР»СЏ
  */
 	public String getPhoneNumberFrom() {
 		return phoneNumberFrom;
 	}
 /**
  * 
- * @return адрес получателя
+ * @return Р°РґСЂРµСЃ РїРѕР»СѓС‡Р°С‚РµР»СЏ
  */
 	public String getPhoneNumberTo() {
 		return phoneNumberTo;
@@ -130,7 +129,7 @@ public class SMSMessage {
     
     /**
      * 
-     * @return идентификатор сообщения назначенный SMSC при отправке. (!!!!)
+     * @return РёРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ СЃРѕРѕР±С‰РµРЅРёСЏ РЅР°Р·РЅР°С‡РµРЅРЅС‹Р№ SMSC РїСЂРё РѕС‚РїСЂР°РІРєРµ. (!!!!)
      */
 	
     public String getSendedID() {

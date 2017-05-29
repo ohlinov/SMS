@@ -13,6 +13,7 @@ import ru.elmsoft.sms.object.SMSMessage;
 
 import java.util.Properties;
 
+
 public class SMPPTransportTest extends TestCase {
     private SMPPTransport transport;
     private SmsService mockSms;
