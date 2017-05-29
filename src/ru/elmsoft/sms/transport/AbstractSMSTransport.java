@@ -151,10 +151,11 @@ public abstract class AbstractSMSTransport implements SMSTransport, MessageEvent
             isNotifySystemEvent = true;
             initProperies = props;
             getLogger().info("Init service");
-            LOGGER.info("Loading file with license");
-            license.load(new FileInputStream(new File("license.txt")));
+            File licenseFile = new File("license.txt");
+            LOGGER.info("Loading file with license " + licenseFile.getAbsolutePath());
+            license.load(new FileInputStream(licenseFile));
             writeToLog(license);
-            getLogger().info("Init service propertyes");
+            getLogger().info("Init service properties");
             writeToLog(props);
 
             getLogger().debug("Property billing.file value is =>" + props.getProperty("billing.file"));
@@ -377,7 +378,8 @@ public abstract class AbstractSMSTransport implements SMSTransport, MessageEvent
             }
         }
         report.setStateNumeric(code);
-        report.setStateString(msg.getMessage());
+        String messageContent = msg.getUserData() != null ? new String (msg.getUserData()) : "";
+        report.setStateString(msg.getMessage() + " " + messageContent);
         notifyAllDLRListener(report);
     }
 
